@@ -410,7 +410,7 @@ M.clouds = function(count, color, y, spread){
   var g = M.grp();
   g.name = 'clouds';
   for(var i=0;i<count;i++){
-    var c = M.grp((Math.random()-0.5)*spread, y + Math.random()*8, -20 - Math.random()*26);
+    var c = M.grp((Math.random()-0.5)*spread, y + Math.random()*3.5, -22 - Math.random()*22);
     var n = 3 + (Math.random()*3|0);
     for(var b=0;b<n;b++){
       var puff = M.ball(1.6 + Math.random()*1.8, color,
@@ -437,8 +437,8 @@ M.birds = function(count, color){
     b.add(wl); b.add(wr);
     b.userData.wings = [wl,wr];
     b.userData.t  = Math.random()*Math.PI*2;
-    b.userData.r  = 16 + Math.random()*10;
-    b.userData.h  = 13 + Math.random()*6;
+    b.userData.r  = 13 + Math.random()*7;
+    b.userData.h  = 10 + Math.random()*3.5;
     b.userData.sp = 0.10 + Math.random()*0.09;
     g.add(b);
   }

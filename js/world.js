@@ -534,7 +534,7 @@ function buildYard(era, S, g, HS, A){
   var deco = era === 'future' ? 0x5f4a7a : (era === 'past' ? 0x3f7a30 : 0x35702c);
   var t1 = M.tree(deco); t1.position.set(-11.5, 0, 3.2); g.add(t1);
   var t2 = M.tree(deco); t2.position.set(12.6, 0, 4.6); g.add(t2);
-  g.add(M.clouds(7, era === 'future' ? 0x6a4a8c : 0xf4f6fa, 16, 70));
+  g.add(M.clouds(8, era === 'future' ? 0x6a4a8c : 0xf4f6fa, 10.5, 66));
   g.add(M.birds(era === 'future' ? 2 : 4, era === 'future' ? 0x2a1a3a : 0x2e2e34));
 
   placeEggs('yard', era, S, g, HS, A);
