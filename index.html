@@ -14,7 +14,10 @@
 
 <div id="view">
   <canvas id="c"></canvas>
+  <div id="grain"></div>
 </div>
+
+<div id="fade"></div>
 
 <div id="status"></div>
 <div id="subtitle"></div>
@@ -24,7 +27,10 @@
 <div id="tools">
   <button class="tool" id="btnMusic" title="Musik an/aus (M)">&#9834;</button>
   <button class="tool" id="btnVoice" title="Sprachausgabe an/aus (V)">&#128483;</button>
+  <button class="tool" id="btnSubs"  title="Untertitel an/aus (U)">CC</button>
+  <button class="tool" id="btnLog"   title="Gesprächsprotokoll (L)">&#128220;</button>
   <button class="tool" id="btnHint"  title="Tipp (H)">?</button>
+  <button class="tool" id="btnFull"  title="Vollbild (F)">&#9974;</button>
   <button class="tool" id="btnHelp"  title="Hilfe">&#9776;</button>
 </div>
 
@@ -42,22 +48,26 @@
        mit einem falschen Diamanten und ist explodiert.</p>
 
     <p>Hoagie landet <b>200 Jahre in der Vergangenheit</b>, Laverne <b>200 Jahre in der
-       Zukunft</b>, Bernard hängt in der <b>Gegenwart</b> fest. Was einer von ihnen in
-       seiner Epoche anstellt, finden die anderen in ihrer wieder.</p>
+       Zukunft</b>, Bernard hängt in der <b>Gegenwart</b> fest. Es ist immer dasselbe Haus:
+       Was einer in seiner Epoche anstellt, finden die anderen in ihrer wieder.</p>
 
     <div class="keys">
       <div><kbd>Links</kbd> Objekt anklicken = handeln, Boden = laufen</div>
       <div><kbd>Rechts</kbd> Objekt ansehen</div>
       <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Figur wechseln</div>
-      <div><kbd>H</kbd> Tipp zum nächsten Schritt</div>
-      <div><kbd>M</kbd> Musik &nbsp; <kbd>V</kbd> Sprachausgabe</div>
-      <div><kbd>Leer</kbd> Text überspringen &nbsp; <kbd>Esc</kbd> abwählen</div>
+      <div><kbd>H</kbd> Tipp — zweimal für Klartext</div>
+      <div><kbd>M</kbd> Musik &nbsp; <kbd>V</kbd> Stimmen &nbsp; <kbd>U</kbd> Untertitel</div>
+      <div><kbd>L</kbd> Protokoll &nbsp; <kbd>F</kbd> Vollbild</div>
+      <div><kbd>Leer</kbd> Text überspringen</div>
+      <div><kbd>Esc</kbd> Auswahl abbrechen</div>
     </div>
 
     <ul>
       <li>Gegenstand unten im Inventar anklicken, dann das Ziel im Bild anklicken.</li>
       <li>Der <b>Chron-o-John</b> spült Gegenstände durch die Jahrhunderte zu den anderen.</li>
       <li>Rechtsklick auf ein Inventarstück beschreibt es.</li>
+      <li>In den Räumen stecken <b>zwölf Anspielungen</b> auf andere Spiele und Filme.
+          Am Ende wird gezählt, wie viele du gefunden hast.</li>
     </ul>
 
     <div class="btnrow"><button class="big" id="btnStart">Spiel starten</button></div>
@@ -70,6 +80,16 @@
     <h1 style="font-size:21px" id="choiceTitle"></h1>
     <p id="choiceText"></p>
     <div class="btnrow" id="choiceBtns"></div>
+  </div>
+</div>
+
+<!-- ----------------------------- Protokoll ----------------------------- -->
+<div class="screen hidden" id="logScreen">
+  <div class="panel">
+    <h1 style="font-size:20px">Gesprächsprotokoll</h1>
+    <h2>Neueste zuerst</h2>
+    <div id="logList"></div>
+    <div class="btnrow"><button class="big alt" id="btnCloseLog">Schließen</button></div>
   </div>
 </div>
 

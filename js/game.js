@@ -19,7 +19,7 @@ var W = World, CH = W.CHARS, ITEMS = W.ITEMS;
 var S = null;
 function newState(){
   return {
-    who:'bernard', sel:null, f:{},
+    who:'bernard', sel:null, f:{}, eggs:{}, hintStep:null, hintLevel:0,
     chars:{
       bernard:{room:'lab', x:2.4, z:1.8, inv:[]},
       hoagie: {room:'lab', x:2.4, z:1.8, inv:[]},
@@ -30,6 +30,9 @@ function newState(){
 function me(){ return S.chars[S.who]; }
 function era(){ return CH[S.who].era; }
 function has(who,item){ return S.chars[who].inv.indexOf(item) >= 0; }
+function anyHas(item){
+  return W.CHAR_IDS.some(function(id){ return has(id,item); });
+}
 
 /* ======================================================================
    2. Renderer, Kamera, Licht
@@ -47,7 +50,12 @@ if('toneMapping' in renderer){
 
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera(42, 16/9, 0.1, 400);
-var CAM_BASE = {x:0, y:8.4, z:17.2, tx:0, ty:2.6, tz:-1};
+var CAM_DEFAULT = {x:0, y:8.4, z:17.2, tx:0, ty:2.6, tz:-1};
+var CAM_ROOM = {
+  cellar:{x:0, y:9.0,  z:15.5, tx:0, ty:1.8, tz:-1},
+  attic: {x:0, y:7.6,  z:15.0, tx:0, ty:2.0, tz:-0.6}
+};
+var CAM = CAM_DEFAULT;
 var camShake = 0;
 
 var ambient = new THREE.AmbientLight(0xffffff, 0.34);
@@ -56,9 +64,9 @@ var key     = new THREE.DirectionalLight(0xffffff, 0.9);
 key.position.set(8, 16, 11);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.left = -18; key.shadow.camera.right = 18;
-key.shadow.camera.top  =  18; key.shadow.camera.bottom = -18;
-key.shadow.camera.near = 1;   key.shadow.camera.far = 56;
+key.shadow.camera.left = -20; key.shadow.camera.right = 20;
+key.shadow.camera.top  =  20; key.shadow.camera.bottom = -20;
+key.shadow.camera.near = 1;   key.shadow.camera.far = 60;
 key.shadow.bias = -0.0016;
 key.shadow.normalBias = 0.03;
 var fill = new THREE.DirectionalLight(0xffffff, 0.16); fill.position.set(-9, 7, 8);
@@ -75,7 +83,7 @@ var ndc = new THREE.Vector2();
    3. Raumaufbau
    ====================================================================== */
 var hotspots = [];
-var actor = null;
+var actor = null, actorShadow = null;
 var walk = {active:false, tx:0, tz:0, phase:0, then:null, stepAcc:0};
 var bounds = W.BOUND;
 
@@ -113,10 +121,12 @@ function buildRoom(){
 
   var e = era(), r = me().room, E = W.ERAS[e];
 
-  ambient.intensity = E.ambI * 0.62;
+  var dim = (r === 'cellar') ? 0.45 : 1.0;          // Keller lebt von seiner Lampe
+  ambient.intensity = E.ambI * 0.62 * dim;
   hemi.color.set(E.hemiSky); hemi.groundColor.set(E.hemiGnd);
+  hemi.intensity = 0.30 * dim;
   key.color.set(E.key);
-  key.intensity = (r === 'yard' ? E.keyI * 1.05 : E.keyI * 0.85);
+  key.intensity = (r === 'yard' ? E.keyI * 1.05 : E.keyI * 0.85) * (r === 'cellar' ? 0.30 : 1.0);
   fill.color.set(E.hemiSky);
   rim.color.set(e === 'future' ? 0x8ad8ff : 0xffe6c0);
   scene.fog = (r === 'yard')
@@ -124,7 +134,10 @@ function buildRoom(){
     : null;
   scene.background = new THREE.Color(r === 'yard' ? E.fog : E.wallB);
 
-  bounds = (r === 'attic') ? W.ATTIC_BOUND : W.BOUND;
+  CAM = CAM_ROOM[r] || CAM_DEFAULT;
+  bounds = (r === 'attic')  ? W.ATTIC_BOUND
+         : (r === 'cellar') ? W.CELLAR_BOUND
+         : W.BOUND;
 
   W.BUILDERS[r](e, S, roomGroup, registerHotspot, API);
 
@@ -133,10 +146,14 @@ function buildRoom(){
   actor.traverse(function(o){ o.userData.isActor = true; });
   roomGroup.add(actor);
 
+  actorShadow = M.blob(0.85, 0.7);
+  actorShadow.userData.isActor = true;
+  roomGroup.add(actorShadow);
+
   walk.active = false; walk.then = null;
   hovered = null; setStatus('');
   drawInv();
-  if(Snd.ready) Snd.playEra(e);
+  if(Snd.ready) Snd.play(e);
 }
 
 function rebuild(){
@@ -151,6 +168,8 @@ var elStatus = document.getElementById('status');
 var elSub    = document.getElementById('subtitle');
 var elInv    = document.getElementById('inv');
 var elCast   = document.getElementById('cast');
+var elFade   = document.getElementById('fade');
+var elLog    = document.getElementById('logList');
 
 function setStatus(txt){
   if(!S){ elStatus.className = ''; return; }
@@ -196,23 +215,40 @@ function drawCast(){
   });
 }
 
+function fadeThen(fn){
+  elFade.classList.add('on');
+  setTimeout(function(){
+    fn();
+    setTimeout(function(){ elFade.classList.remove('on'); }, 40);
+  }, 180);
+}
+
 function switchTo(id){
   if(!S || id === S.who) return;
   me().x = actor.position.x; me().z = actor.position.z;
-  S.who = id; S.sel = null;
   clearSay(); Voice.shutUp();
-  buildRoom(); drawCast();
-  say('[' + CH[id].name + ' — ' + W.ROOM_LABEL[me().room][era()] + ']', 'sys');
+  fadeThen(function(){
+    S.who = id; S.sel = null;
+    buildRoom(); drawCast();
+    say('[' + CH[id].name + ' — ' + W.ROOM_LABEL[me().room][era()] + ']', 'sys');
+  });
 }
 
 /* ---------------------- Untertitel + Sprachausgabe ------------------- */
 var sayQ = [], sayTimer = null, sayActive = false;
+var subsOn = true, logLines = [];
 var SPEAKER = {sys:'#cbb8e8', npc:'#ffe0a0', tent:'#e0a0ff'};
 
 function say(text, who){
   if(!text) return;
   sayQ.push({t:String(text), w:who || (S ? S.who : 'sys')});
   if(!sayActive) nextSay();
+}
+
+function pushLog(who, text){
+  var label = CH[who] ? CH[who].name : (who === 'tent' ? 'Lila Tentakel' : (who === 'npc' ? 'Jemand' : ''));
+  logLines.push({w:who, l:label, t:text});
+  if(logLines.length > 60) logLines.shift();
 }
 
 function nextSay(){
@@ -222,16 +258,21 @@ function nextSay(){
   var s = sayQ.shift();
   var color = SPEAKER[s.w] || (CH[s.w] ? CH[s.w].ui : '#ffffff');
   var label = CH[s.w] ? CH[s.w].name : (s.w === 'tent' ? 'LILA TENTAKEL' : '');
-  elSub.innerHTML = (label ? '<b>' + label + '</b>' : '') +
-                    s.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  elSub.style.color = color;
+  pushLog(s.w, s.t);
+
+  if(subsOn){
+    elSub.innerHTML = (label ? '<b>' + label + '</b>' : '') +
+                      s.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    elSub.style.color = color;
+  } else {
+    elSub.innerHTML = '';
+  }
 
   var fallback = Math.max(1800, Math.min(7000, s.t.length * 55));
   var spoke = Voice.speak(s.t, s.w, function(){
     if(sayTimer){ clearTimeout(sayTimer); sayTimer = null; }
     nextSay();
   });
-  // Auch wenn gesprochen wird: Sicherheitsnetz, falls onend nie feuert.
   sayTimer = setTimeout(nextSay, spoke ? fallback + 3500 : fallback);
 }
 
@@ -290,12 +331,29 @@ function doFlush(item, target){
 }
 
 /* ======================================================================
-   5. API für die Raumdefinitionen
+   5. Anspielungen
+   ====================================================================== */
+function eggTotal(){ return W.EGGS.length; }
+function eggFound(){ return Object.keys(S.eggs).length; }
+
+function foundEgg(id){
+  if(!id || S.eggs[id]) return;
+  S.eggs[id] = true;
+  Snd.sfx('egg');
+  setTimeout(function(){
+    say('✦ Anspielung entdeckt — ' + eggFound() + ' von ' + eggTotal() + '.', 'sys');
+  }, 30);
+}
+
+/* ======================================================================
+   6. API für die Raumdefinitionen
    ====================================================================== */
 var API = {
   say: say,
-  sfx: function(n){ Snd.sfx(n); },
+  who: function(){ return S.who; },
+  sfx: function(n){ if(n === 'loom') Snd.loomTune(); else Snd.sfx(n); },
   has: has,
+  egg: foundEgg,
   give: function(who, item){
     if(!has(who, item)) S.chars[who].inv.push(item);
     if(who === S.who) drawInv();
@@ -307,16 +365,19 @@ var API = {
   },
   set: function(flag, val){
     S.f[flag] = (val === undefined) ? true : val;
+    S.hintStep = null; S.hintLevel = 0;
     setTimeout(rebuild, 0);
   },
+  setQuiet: function(flag, val){ S.f[flag] = (val === undefined) ? true : val; },
   rebuild: rebuild,
+  rebuildSoon: function(){ setTimeout(rebuild, 0); },
   flush: askFlush,
   wear: function(){ return wearCostume(); },
   win: winGame
 };
 
 /* ======================================================================
-   6. Interaktion
+   7. Interaktion
    ====================================================================== */
 var DULL = ['Das bringt nichts.', 'Damit kann {n} nichts anfangen.',
             'Interessant. Und völlig nutzlos.', 'Nein.', 'Das führt zu gar nichts.'];
@@ -363,21 +424,25 @@ function changeRoom(target){
     say('Da kommt hier niemand hinauf.', 'sys');
     return;
   }
-  me().room = target;
-  if(target === 'yard'){
-    if(from === 'attic'){ me().x = 5.2; me().z = 3.0; }
-    else { me().x = 0; me().z = -1.2; }
-  } else if(target === 'kitchen'){
-    me().x = (from === 'yard') ? -6.0 : 6.0; me().z = -2.2;
-  } else if(target === 'lab'){
-    me().x = -6.2; me().z = -2.2;
-  } else {                                   // attic
-    me().x = 4.0; me().z = 2.0;
-  }
   clearSay();
   Snd.sfx('door');
-  buildRoom();
-  say('[' + W.ROOM_LABEL[target][e] + ']', 'sys');
+  fadeThen(function(){
+    me().room = target;
+    if(target === 'yard'){
+      if(from === 'attic'){ me().x = 5.2; me().z = 3.0; }
+      else { me().x = 0; me().z = -1.2; }
+    } else if(target === 'kitchen'){
+      me().x = (from === 'yard') ? -6.0 : 6.0; me().z = -2.2;
+    } else if(target === 'lab'){
+      me().x = (from === 'cellar') ? -6.4 : -6.2; me().z = (from === 'cellar') ? 2.6 : -2.2;
+    } else if(target === 'cellar'){
+      me().x = 5.4; me().z = 3.2;
+    } else {                                   // attic
+      me().x = 4.0; me().z = 2.0;
+    }
+    buildRoom();
+    say('[' + W.ROOM_LABEL[target][e] + ']', 'sys');
+  });
 }
 
 /* --------------------------- Maus ------------------------------------ */
@@ -405,7 +470,7 @@ canvas.addEventListener('mousemove', function(ev){
   var p = pick(ev);
   var n = p.hs ? p.hs.name : '';
   if(n !== hovered){ hovered = n; setStatus(n); }
-  canvas.style.cursor = p.hs ? 'pointer' : (p.floor ? 'default' : 'default');
+  canvas.style.cursor = p.hs ? 'pointer' : 'default';
 });
 
 canvas.addEventListener('contextmenu', function(ev){
@@ -435,72 +500,185 @@ canvas.addEventListener('click', function(ev){
 });
 
 document.addEventListener('keydown', function(ev){
-  if(!S) return;
   var k = (ev.key || '').toLowerCase();
-  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); }
+  if(k === 'f'){ ev.preventDefault(); toggleFullscreen(); return; }
+  if(!S) return;
+  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); }
   else if(k === 'h'){ showHint(); }
   else if(k === '1'){ switchTo('bernard'); }
   else if(k === '2'){ switchTo('hoagie'); }
   else if(k === '3'){ switchTo('laverne'); }
   else if(k === 'm'){ toggleMusic(); }
   else if(k === 'v'){ toggleVoice(); }
+  else if(k === 'u'){ toggleSubs(); }
+  else if(k === 'l'){ toggleLog(); }
   else if(k === ' '){ ev.preventDefault(); skipSay(); }
 });
 
 /* ======================================================================
-   7. Tipps
+   8. Tipps — zielbasiert statt starre Reihenfolge
    ====================================================================== */
-function hintText(){
-  var f = S.f;
-  if(!f.coalTaken)
-    return 'Bernard (Gegenwart): Im Kamin der Küche liegt etwas sehr Schwarzes.';
-  if(!has('hoagie','coal') && !f.coalInCement)
-    return 'Bernard: Kohle auswählen, dann den Chron-o-John im Labor anklicken — und zu Hoagie ins Jahr 1776 spülen.';
-  if(!f.coalInCement)
-    return 'Hoagie (1776): Draußen wird gerade der Eckstein gegossen. Der Zement ist noch weich …';
-  if(!f.acornTaken && !f.treePlanted)
-    return 'Hoagie: Unter dem alten Baum links im Hof liegt eine Eichel.';
-  if(!f.treePlanted)
-    return 'Hoagie: Neben dem Haus ist ein frisch umgegrabenes Beet. Da gehört die Eichel hinein.';
-  if(!f.wineTaken && !f.wineInNiche)
-    return 'Hoagie: Auf dem Küchentisch von 1776 steht eine Weinflasche.';
-  if(!f.wineInNiche)
-    return 'Hoagie: In der Küchenwand sitzt ein loser Ziegel mit einer Nische. Wein hinein — und zweihundert Jahre warten.';
-  if(!f.hamsterTaken && !has('laverne','hamster') && !f.hamsterInWheel)
-    return 'Bernard: Der Baum im Hof reicht jetzt bis zur Dachluke. Auf dem Dachboden sitzt ein Hamster im Käfig.';
-  if(!has('laverne','hamster') && !f.hamsterInWheel)
-    return 'Bernard: Den Hamster durch den Chron-o-John zu Laverne schicken.';
-  if(!f.hamsterInWheel)
-    return 'Laverne (2200): Über den Baum aufs Dach. Dort steht ein Generator mit leerem Laufrad.';
-  if(!f.costumeTaken)
-    return 'Laverne: Die Vitrine auf dem Dachboden ist jetzt entriegelt. Darin hängt ein Tentakelkostüm.';
-  if(!f.disguised)
-    return 'Laverne: Das Kostüm im Inventar auswählen und damit das Wach-Tentakel im Hof anklicken.';
-  if(!f.vinegarTaken)
-    return 'Laverne: Der lose Ziegel in der Kantine. Schau nach, was aus dem Wein geworden ist.';
-  if(!f.diamondTaken)
-    return 'Laverne: Den uralten Essig auf den Eckstein im Hof kippen. Säure frisst Beton.';
-  if(!has('bernard','diamond') && !f.diamondInstalled)
-    return 'Laverne: Den Diamanten durch den Chron-o-John zu Bernard schicken.';
-  if(!f.diamondInstalled)
-    return 'Bernard: Den Diamanten in die Energiekonsole im Labor setzen.';
-  if(!f.wrenchTaken && !has('bernard','wrench'))
-    return 'Hoagie: In der Werkstatt von 1776 liegt ein schwerer Schraubenschlüssel auf der Werkbank.';
-  if(!has('bernard','wrench') && !f.valveClosed)
-    return 'Hoagie: Den Schraubenschlüssel durch den Chron-o-John zu Bernard spülen.';
-  if(!f.valveClosed)
-    return 'Bernard: Den Schraubenschlüssel am verrosteten Ventil des Sludge-o-Matic ansetzen.';
-  return 'Alles erledigt! Mit Bernard ins Labor und den Chron-o-John benutzen.';
+var STEPS = [
+  { id:'coal', who:'bernard',
+    done:function(f){ return f.coalTaken; },
+    vague:'Bernard: In der Küche liegt etwas herum, das mit genug Zeit sehr wertvoll wird.',
+    exact:'Bernard: Im Kamin der Küche liegt ein Klumpen Kohle. Nimm ihn mit.' },
+
+  { id:'coal-flush', who:'bernard',
+    needs:function(f){ return has('bernard','coal'); },
+    done:function(f){ return f.coalInCement || has('hoagie','coal'); },
+    vague:'Bernard: Die Kohle nützt in der Gegenwart nichts. Sie muss viel weiter zurück.',
+    exact:'Bernard: Kohle im Inventar auswählen, dann den Chron-o-John anklicken und zu Hoagie schicken.' },
+
+  { id:'cement', who:'hoagie',
+    needs:function(f){ return has('hoagie','coal'); },
+    done:function(f){ return f.coalInCement; },
+    vague:'Hoagie: Draußen wird gerade etwas gegossen, das sehr lange hält.',
+    exact:'Hoagie: Die Kohle in den nassen Zement des Ecksteins im Hof drücken.' },
+
+  { id:'acorn', who:'hoagie',
+    done:function(f){ return f.acornTaken || f.treePlanted; },
+    vague:'Hoagie: Unter den alten Bäumen im Hof liegt etwas, aus dem einmal viel wird.',
+    exact:'Hoagie: Links im Hof von 1776 liegt eine Eichel. Aufheben.' },
+
+  { id:'plant', who:'hoagie',
+    needs:function(f){ return has('hoagie','acorn'); },
+    done:function(f){ return f.treePlanted; },
+    vague:'Hoagie: Die Eichel gehört in die Erde — und zwar dort, wo später jemand hochklettern will.',
+    exact:'Hoagie: Die Eichel in das umgegrabene Beet neben dem Haus pflanzen.' },
+
+  { id:'wine', who:'hoagie',
+    done:function(f){ return f.wineTaken || f.wineInNiche; },
+    vague:'Hoagie: In der Küche steht etwas, das mit den Jahren deutlich saurer wird.',
+    exact:'Hoagie: Die Weinflasche vom Küchentisch von 1776 nehmen.' },
+
+  { id:'niche', who:'hoagie',
+    needs:function(f){ return has('hoagie','wine'); },
+    done:function(f){ return f.wineInNiche; },
+    vague:'Hoagie: Der Wein muss an einen Ort, an den vierhundert Jahre lang niemand geht.',
+    exact:'Hoagie: Die Weinflasche in die Nische hinter dem losen Ziegel in der Küche stellen.' },
+
+  { id:'hamster', who:'bernard',
+    needs:function(f){ return f.treePlanted; },
+    done:function(f){ return f.hamsterTaken || f.hamsterInWheel || anyHas('hamster'); },
+    vague:'Bernard: Der Baum im Hof reicht inzwischen bis zum Dach. Da oben war lange niemand.',
+    exact:'Bernard: Über die Eiche auf den Dachboden. Dort sitzt ein Hamster im Käfig.' },
+
+  { id:'hamster-flush', who:'bernard',
+    needs:function(f){ return has('bernard','hamster'); },
+    done:function(f){ return f.hamsterInWheel || has('laverne','hamster'); },
+    vague:'Bernard: Der Hamster wird woanders dringender gebraucht.',
+    exact:'Bernard: Den Hamster über den Chron-o-John zu Laverne schicken.' },
+
+  { id:'wheel', who:'laverne',
+    needs:function(f){ return has('laverne','hamster'); },
+    done:function(f){ return f.hamsterInWheel; },
+    vague:'Laverne: Auf dem Dachboden fehlt einer Maschine der Antrieb.',
+    exact:'Laverne: Über die Eiche aufs Dach. Den Hamster in das Laufrad des Generators setzen.' },
+
+  { id:'costume', who:'laverne',
+    needs:function(f){ return f.hamsterInWheel; },
+    done:function(f){ return f.costumeTaken; },
+    vague:'Laverne: Mit Strom lässt sich jetzt etwas öffnen, das vorher zu war.',
+    exact:'Laverne: Die Museumsvitrine ist entriegelt. Das Tentakelkostüm herausnehmen.' },
+
+  /* Nur nötig, solange es überhaupt noch eine Wache gibt. */
+  { id:'disguise', who:'laverne',
+    needs:function(f){ return has('laverne','costume') && !f.valveClosed; },
+    done:function(f){ return f.disguised || f.valveClosed; },
+    vague:'Laverne: Die Wache lässt keinen Menschen an den Eckstein. Ein Tentakel schon.',
+    exact:'Laverne: Das Kostüm auswählen und damit das Wach-Tentakel im Hof anklicken.' },
+
+  { id:'vinegar', who:'laverne',
+    needs:function(f){ return f.wineInNiche; },
+    done:function(f){ return f.vinegarTaken || anyHas('vinegar') || f.diamondTaken; },
+    vague:'Laverne: In der Kantine wartet seit vierhundert Jahren etwas in der Wand.',
+    exact:'Laverne: Den losen Ziegel in der Kantine öffnen und die alte Flasche nehmen.' },
+
+  { id:'cornerstone', who:'laverne',
+    needs:function(f){ return has('laverne','vinegar') && f.coalInCement && (f.disguised || f.valveClosed); },
+    done:function(f){ return f.diamondTaken; },
+    vague:'Laverne: Der Eckstein gibt seinen Inhalt nicht freiwillig her. Säure schon eher.',
+    exact:'Laverne: Den uralten Essig auf den Eckstein im Hof kippen.' },
+
+  { id:'diamond-flush', who:'laverne',
+    needs:function(f){ return has('laverne','diamond'); },
+    done:function(f){ return f.diamondInstalled || has('bernard','diamond'); },
+    vague:'Laverne: Der Diamant nützt in der Zukunft niemandem.',
+    exact:'Laverne: Den Diamanten über den Chron-o-John zu Bernard schicken.' },
+
+  { id:'install', who:'bernard',
+    needs:function(f){ return has('bernard','diamond'); },
+    done:function(f){ return f.diamondInstalled; },
+    vague:'Bernard: Der Antrieb der Zeitmaschine wartet noch auf seinen Kristall.',
+    exact:'Bernard: Den Diamanten in die Energiekonsole im Labor einsetzen.' },
+
+  { id:'wrench', who:'hoagie',
+    done:function(f){ return f.wrenchTaken || anyHas('wrench') || f.valveClosed; },
+    vague:'Hoagie: In der Werkstatt liegt schweres Werkzeug herum.',
+    exact:'Hoagie: Den Schraubenschlüssel von der Werkbank in der Werkstatt nehmen.' },
+
+  { id:'wrench-flush', who:'hoagie',
+    needs:function(f){ return has('hoagie','wrench'); },
+    done:function(f){ return f.valveClosed || has('bernard','wrench'); },
+    vague:'Hoagie: Das Werkzeug wird zweihundert Jahre später gebraucht.',
+    exact:'Hoagie: Den Schraubenschlüssel über den Chron-o-John zu Bernard schicken.' },
+
+  { id:'valve', who:'bernard',
+    needs:function(f){ return has('bernard','wrench'); },
+    done:function(f){ return f.valveClosed; },
+    vague:'Bernard: Solange Schlamm in den Fluss läuft, bleibt die Zukunft lila.',
+    exact:'Bernard: Mit dem Schraubenschlüssel das verrostete Ventil am Sludge-o-Matic zudrehen.' },
+
+  { id:'finale', who:'bernard',
+    needs:function(f){ return f.diamondInstalled && f.valveClosed; },
+    done:function(f){ return false; },
+    vague:'Alles ist vorbereitet. Zeit, nach Hause zu fahren.',
+    exact:'Bernard: Ins Labor gehen und den Chron-o-John benutzen — ohne etwas ausgewählt zu haben.' }
+];
+
+function openSteps(){
+  return STEPS.filter(function(st){
+    if(st.done(S.f)) return false;
+    if(st.needs && !st.needs(S.f)) return false;
+    return true;
+  });
 }
-function showHint(){ clearSay(); say(hintText(), 'sys'); }
+
+function showHint(){
+  clearSay();
+  var open = openSteps();
+
+  if(!open.length){
+    say('Gerade ist nichts offen, was ich empfehlen könnte. Sieh dich um — oder wechsle die Figur.', 'sys');
+    return;
+  }
+
+  // Schritte der aktuellen Figur haben Vorrang
+  var mine = open.filter(function(st){ return st.who === S.who; });
+  var step = mine.length ? mine[0] : open[0];
+
+  // Zweimal drücken = konkreter Hinweis
+  if(S.hintStep === step.id){ S.hintLevel = Math.min(1, S.hintLevel + 1); }
+  else { S.hintStep = step.id; S.hintLevel = 0; }
+
+  if(step.who !== S.who && !mine.length)
+    say('Für ' + CH[S.who].name + ' ist hier gerade nichts zu tun. Wechsle zu ' +
+        CH[step.who].name + ' (' + CH[step.who].sub + ').', 'sys');
+
+  say(S.hintLevel === 0 ? step.vague : step.exact, 'sys');
+  if(S.hintLevel === 0)
+    say('(Nochmal auf Tipp drücken, wenn es deutlicher sein soll.)', 'sys');
+}
 
 /* ======================================================================
-   8. Kostüm anziehen (Inventar-Sonderfall)
+   9. Kostüm
    ====================================================================== */
 function wearCostume(){
   if(S.who !== 'laverne' || !has('laverne','costume')) return false;
   if(S.f.disguised) return false;
   S.f.disguised = true;
+  S.hintStep = null; S.hintLevel = 0;
   Snd.sfx('solve');
   say('Laverne zwängt sich in das Tentakelkostüm.');
   say('"Kratzt wie Stahlwolle. Aber ich sehe aus wie eine sehr überzeugte Verwaltungsangestellte."','laverne');
@@ -510,52 +688,105 @@ function wearCostume(){
 }
 
 /* ======================================================================
-   9. Ende
+   10. Ende
    ====================================================================== */
 function winGame(){
   Snd.sfx('win');
+  var eggs = eggFound(), total = eggTotal();
+  var eggLine = eggs >= total
+    ? '<b>Alle ' + total + ' Anspielungen gefunden.</b> Respekt — du hast in jede Ecke geschaut.'
+    : 'Gefundene Anspielungen: <b>' + eggs + ' von ' + total + '</b>. Da liegt noch was herum.';
+
   document.getElementById('endTitle').textContent = 'GESCHAFFT!';
   document.getElementById('endText').innerHTML =
     'Der Sludge-o-Matic steht still. Kein Tropfen Giftschlamm erreicht je den Fluss — und ein ' +
     'gewisses lila Tentakel trinkt an diesem Nachmittag einfach nur Wasser.<br><br>' +
     'Der Diamant aus dem Eckstein treibt den Chron-o-John mit voller Kraft an. Drei Kabinen ' +
-    'surren, blitzen — und Bernard, Hoagie und Laverne stehen wieder gemeinsam in Dr. Freds Keller. ' +
-    'Über ihnen rauscht eine vierhundert Jahre alte Eiche, in deren Krone ein Hamster wohnt, ' +
-    'der noch nicht weiß, dass er die Weltgeschichte gerettet hat.<br><br>' +
+    'surren, blitzen — und Bernard, Hoagie und Laverne stehen wieder gemeinsam in Dr. Freds ' +
+    'Keller. Über ihnen rauscht eine vierhundert Jahre alte Eiche, in deren Krone ein Hamster ' +
+    'wohnt, der noch nicht weiß, dass er die Weltgeschichte gerettet hat.<br><br>' +
     '<i>"Und? Wie war die Zukunft?"</i> fragt Dr. Fred.<br>' +
     '<i>"Langweilig"</i>, sagt Laverne. <i>"Zum Glück."</i><br><br>' +
+    eggLine + '<br><br>' +
     '<b>ENDE</b> — ein Fanspiel im Geiste von <i>Day of the Tentacle</i>.';
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
 /* ======================================================================
-   10. Ton-Schalter
+   11. Schalter: Ton, Untertitel, Protokoll, Vollbild
    ====================================================================== */
 var btnMusic = document.getElementById('btnMusic');
 var btnVoice = document.getElementById('btnVoice');
+var btnSubs  = document.getElementById('btnSubs');
+var logScreen = document.getElementById('logScreen');
+
 function toggleMusic(){
   Snd.init(); Snd.resume();
   var on = Snd.toggle();
   btnMusic.classList.toggle('off', !on);
-  if(on && S) Snd.playEra(era());
+  if(on) Snd.play(S ? era() : 'title');
 }
 function toggleVoice(){
   var on = Voice.toggle();
   btnVoice.classList.toggle('off', !on);
-  if(!on && sayActive){                   // ohne Stimme wieder auf Timer umstellen
+  if(!on && sayActive){
     if(sayTimer) clearTimeout(sayTimer);
     sayTimer = setTimeout(nextSay, 2200);
   }
 }
+function toggleSubs(){
+  subsOn = !subsOn;
+  btnSubs.classList.toggle('off', !subsOn);
+  if(!subsOn) elSub.innerHTML = '';
+  say(subsOn ? 'Untertitel an.' : '', 'sys');
+}
+
+function openLog(){
+  elLog.innerHTML = '';
+  if(!logLines.length){
+    elLog.innerHTML = '<p style="opacity:.6">Noch nichts gesagt.</p>';
+  } else {
+    logLines.slice().reverse().forEach(function(l){
+      var d = document.createElement('div');
+      d.className = 'logline';
+      var c = SPEAKER[l.w] || (CH[l.w] ? CH[l.w].ui : '#ffffff');
+      d.innerHTML = (l.l ? '<span style="color:' + c + '">' + l.l + ':</span> ' : '') +
+                    l.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      elLog.appendChild(d);
+    });
+  }
+  logScreen.classList.remove('hidden');
+}
+function closeLog(){ logScreen.classList.add('hidden'); }
+function toggleLog(){ logScreen.classList.contains('hidden') ? openLog() : closeLog(); }
+
+function isFullscreen(){
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+function goFullscreen(){
+  var el = document.documentElement;
+  var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if(fn){ try{ var r = fn.call(el); if(r && r.catch) r.catch(function(){}); }catch(e){} }
+}
+function leaveFullscreen(){
+  var fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+  if(fn){ try{ var r = fn.call(document); if(r && r.catch) r.catch(function(){}); }catch(e){} }
+}
+function toggleFullscreen(){ isFullscreen() ? leaveFullscreen() : goFullscreen(); }
+
 btnMusic.onclick = toggleMusic;
 btnVoice.onclick = toggleVoice;
+btnSubs.onclick  = toggleSubs;
+document.getElementById('btnLog').onclick  = toggleLog;
+document.getElementById('btnFull').onclick = toggleFullscreen;
 document.getElementById('btnHint').onclick = showHint;
 document.getElementById('btnHelp').onclick = function(){
   document.getElementById('titleScreen').classList.remove('hidden');
 };
+document.getElementById('btnCloseLog').onclick = closeLog;
 
 /* ======================================================================
-   11. Animationsschleife
+   12. Animationsschleife
    ====================================================================== */
 var clock = new THREE.Clock();
 function resize(){
@@ -571,9 +802,11 @@ global.addEventListener('resize', resize);
 function autoResize(){
   var w = canvas.clientWidth, h = canvas.clientHeight;
   if(!w || !h) return;
-  if(canvas.width !== Math.floor(w * renderer.getPixelRatio()) ||
-     canvas.height !== Math.floor(h * renderer.getPixelRatio())) resize();
+  var pr = renderer.getPixelRatio();
+  if(canvas.width !== Math.floor(w*pr) || canvas.height !== Math.floor(h*pr)) resize();
 }
+
+var blinkTimer = 0, blinkPhase = 0;
 
 function animate(){
   requestAnimationFrame(animate);
@@ -608,6 +841,7 @@ function animate(){
       var d2 = ((0 - actor.rotation.y + Math.PI*3) % (Math.PI*2)) - Math.PI;
       actor.rotation.y += d2 * Math.min(1, dt*4);
     }
+
     var p = actor.userData.parts;
     if(p){
       if(walk.active){
@@ -624,6 +858,21 @@ function animate(){
         p.torso.rotation.z = 0;
         actor.position.y = (Math.sin(walk.phase)*0.5+0.5)*0.04;
       }
+      /* Blinzeln */
+      blinkTimer -= dt;
+      if(blinkTimer <= 0){ blinkPhase = 0.16; blinkTimer = 2.4 + Math.random()*4.0; }
+      if(blinkPhase > 0){
+        blinkPhase -= dt;
+        p.lidL.scale.y = p.lidR.scale.y = 1;
+      } else {
+        p.lidL.scale.y = p.lidR.scale.y = 0.02;
+      }
+    }
+
+    if(actorShadow){
+      actorShadow.position.set(actor.position.x, 0.035, actor.position.z);
+      var sc = walk.active ? 1.0 : 1.05;
+      actorShadow.scale.set(sc, sc, sc);
     }
   }
 
@@ -638,15 +887,17 @@ function animate(){
     o.scale.x = 1 + Math.sin(t*6)*0.09; o.scale.z = 1 + Math.cos(t*5)*0.09;
   }
   if((o = roomGroup.getObjectByName('sludgePool'))) o.scale.y = 1 + Math.sin(t*3)*0.14;
+  if((o = roomGroup.getObjectByName('river'))){
+    o.position.y = 0.07 + Math.sin(t*1.4)*0.025;
+    o.scale.z = 1 + Math.sin(t*0.9)*0.02;
+  }
   if((o = roomGroup.getObjectByName('fire'))){
     o.scale.y = 1 + Math.sin(t*11)*0.22 + Math.sin(t*7.3)*0.12;
     o.scale.x = 1 + Math.cos(t*9)*0.10;
   }
   if((o = roomGroup.getObjectByName('fireLight'))) o.intensity = 1.35 + Math.sin(t*13)*0.35;
-  if((o = roomGroup.getObjectByName('towerOrb'))){
-    o.scale.setScalar(1 + Math.sin(t*1.6)*0.07);
-  }
-  if((o = roomGroup.getObjectByName('crown'))) o.rotation.y = Math.sin(t*0.4)*0.05;
+  if((o = roomGroup.getObjectByName('cellarLamp'))) o.intensity = 1.45 + Math.sin(t*2.3)*0.12;
+  if((o = roomGroup.getObjectByName('towerOrb'))) o.scale.setScalar(1 + Math.sin(t*1.6)*0.07);
   if((o = roomGroup.getObjectByName('purpleTent'))){
     o.rotation.z = Math.sin(t*1.3)*0.05;
     o.position.y = 0.70 + Math.abs(Math.sin(t*1.3))*0.06;
@@ -655,6 +906,11 @@ function animate(){
   if((o = roomGroup.getObjectByName('hamster'))) o.position.x = Math.sin(t*3)*0.28;
   if((o = roomGroup.getObjectByName('hamsterWheel'))) o.rotation.z -= dt*7;
   if((o = roomGroup.getObjectByName('hamsterRun'))) o.rotation.z = Math.sin(t*14)*0.25;
+  if((o = roomGroup.getObjectByName('loomSpin'))) o.rotation.z += dt*0.35;
+  if((o = roomGroup.getObjectByName('meteorBody'))){
+    if(o.material.emissive) o.material.emissive.setRGB(0.30+Math.sin(t*1.7)*0.12, 0.05, 0.02);
+  }
+  if((o = roomGroup.getObjectByName('threeHeaded'))) o.rotation.y = Math.sin(t*0.8)*0.25;
   for(var mi=0; mi<6; mi++){
     if((o = roomGroup.getObjectByName('monitor'+mi)) && o.material.emissive){
       var v = 0.5 + Math.sin(t*3 + mi*1.7)*0.3;
@@ -663,29 +919,50 @@ function animate(){
   }
   if((o = roomGroup.getObjectByName('dust'))) o.rotation.y = t*0.03;
 
-  /* --- Kamera: leichtes Atmen + Erschütterung --- */
+  /* Wolken ziehen, Vögel kreisen */
+  if((o = roomGroup.getObjectByName('clouds'))){
+    for(var ci=0; ci<o.children.length; ci++){
+      var cl = o.children[ci];
+      cl.position.x += cl.userData.drift * dt;
+      if(cl.position.x > 46) cl.position.x = -46;
+    }
+  }
+  if((o = roomGroup.getObjectByName('birds'))){
+    for(var bi=0; bi<o.children.length; bi++){
+      var bd = o.children[bi], u = bd.userData;
+      u.t += dt * u.sp;
+      bd.position.set(Math.cos(u.t)*u.r, u.h + Math.sin(u.t*1.7)*1.2, Math.sin(u.t)*u.r - 12);
+      bd.rotation.y = -u.t;
+      var flap = Math.sin(t*9 + bi) * 0.6;
+      u.wings[0].rotation.z =  flap;
+      u.wings[1].rotation.z = -flap;
+    }
+  }
+
+  /* --- Kamera: leichtes Atmen und Erschütterung --- */
   var shake = camShake > 0 ? camShake : 0;
   if(camShake > 0) camShake = Math.max(0, camShake - dt*1.4);
   camera.position.set(
-    CAM_BASE.x + Math.sin(t*0.31)*0.18 + (Math.random()-0.5)*shake*0.5,
-    CAM_BASE.y + Math.sin(t*0.23)*0.10 + (Math.random()-0.5)*shake*0.5,
-    CAM_BASE.z
+    CAM.x + Math.sin(t*0.31)*0.18 + (Math.random()-0.5)*shake*0.5,
+    CAM.y + Math.sin(t*0.23)*0.10 + (Math.random()-0.5)*shake*0.5,
+    CAM.z
   );
-  camera.lookAt(CAM_BASE.tx, CAM_BASE.ty, CAM_BASE.tz);
+  camera.lookAt(CAM.tx, CAM.ty, CAM.tz);
 
   renderer.render(scene, camera);
 }
 
 /* ======================================================================
-   12. Start
+   13. Start
    ====================================================================== */
 function startGame(){
   S = newState();
   clearSay();
+  logLines = [];
   drawCast();
   buildRoom();
   resize();
-  Snd.init(); Snd.resume(); Snd.playEra(era());
+  Snd.init(); Snd.resume(); Snd.play(era());
   say('Der Chron-o-John ist explodiert. Bernard steckt in der Gegenwart fest.', 'sys');
   say('"Hoagie? Laverne? Hört ihr mich? … Natürlich nicht. Ihr seid zweihundert Jahre weit weg."', 'bernard');
   say('Oben links wechselst du die Figur, unten liegt dein Inventar. H gibt einen Tipp.', 'sys');
@@ -693,9 +970,10 @@ function startGame(){
 
 document.getElementById('btnStart').onclick = function(){
   document.getElementById('titleScreen').classList.add('hidden');
+  goFullscreen();
   Snd.init(); Snd.resume();
   Voice.init();
-  if(!S) startGame(); else Snd.playEra(era());
+  if(!S) startGame(); else Snd.play(era());
 };
 document.getElementById('btnRestart').onclick = function(){
   document.getElementById('endScreen').classList.add('hidden');
@@ -703,11 +981,21 @@ document.getElementById('btnRestart').onclick = function(){
   startGame();
 };
 
+/* Titelmusik, sobald der Ton freigeschaltet werden darf */
+function primeTitleMusic(){
+  if(Snd.init()){ Snd.resume(); if(!S) Snd.play('title'); }
+  document.removeEventListener('pointerdown', primeTitleMusic);
+  document.removeEventListener('keydown', primeTitleMusic);
+}
+document.addEventListener('pointerdown', primeTitleMusic);
+document.addEventListener('keydown', primeTitleMusic);
+
 /* ---------------------- Debug-API für die Konsole -------------------- */
 global.DOTT = {
   help:function(){ return ['DOTT.state()','DOTT.spots()','DOTT.act(name,verb)','DOTT.sel(item)',
-                           'DOTT.give(item)','DOTT.who(id)','DOTT.go(room)','DOTT.flag(k,v)']; },
-  state:function(){ return {who:S.who, room:me().room, era:era(), flags:S.f,
+                           'DOTT.give(item)','DOTT.who(id)','DOTT.go(room)','DOTT.flag(k,v)',
+                           'DOTT.hint()','DOTT.eggs()']; },
+  state:function(){ return {who:S.who, room:me().room, era:era(), flags:S.f, eggs:S.eggs,
     inv:{bernard:S.chars.bernard.inv.slice(), hoagie:S.chars.hoagie.inv.slice(),
          laverne:S.chars.laverne.inv.slice()}}; },
   spots:function(){ return hotspots.map(function(h){ return h.name; }); },
@@ -722,9 +1010,27 @@ global.DOTT = {
   sel:function(item){ S.sel = item || null; drawInv(); return S.sel; },
   give:function(item){ API.give(S.who, item); return S.chars[S.who].inv.slice(); },
   wear:wearCostume,
-  who:function(id){ switchTo(id); return S.who; },
-  go:function(room){ changeRoom(room); return me().room; },
-  flag:function(k,v){ S.f[k] = (v === undefined) ? true : v; buildRoom(); return S.f; }
+  who:function(id){
+    if(!id || id === S.who) return S.who;
+    me().x = actor.position.x; me().z = actor.position.z;
+    S.who = id; S.sel = null; clearSay(); buildRoom(); drawCast();
+    return S.who;
+  },
+  go:function(room){
+    var from = me().room, e = era();
+    if(!W.canEnter(room, e, S)) return 'nicht erreichbar: ' + room;
+    me().room = room;
+    if(room === 'yard'){ me().x = 0; me().z = -1.2; }
+    else if(room === 'kitchen'){ me().x = (from === 'yard') ? -6.0 : 6.0; me().z = -2.2; }
+    else if(room === 'lab'){ me().x = -6.2; me().z = -2.2; }
+    else if(room === 'cellar'){ me().x = 5.4; me().z = 3.2; }
+    else { me().x = 4.0; me().z = 2.0; }
+    clearSay(); buildRoom();
+    return me().room;
+  },
+  flag:function(k,v){ S.f[k] = (v === undefined) ? true : v; buildRoom(); return S.f; },
+  hint:function(){ showHint(); return openSteps().map(function(s){ return s.id; }); },
+  eggs:function(){ return {found:eggFound(), total:eggTotal(), list:Object.keys(S.eggs)}; }
 };
 
 document.getElementById('boot').classList.add('hidden');

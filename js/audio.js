@@ -1,75 +1,162 @@
 /* =========================================================================
    audio.js — prozedurale Musik, Soundeffekte und Sprachausgabe.
-   Alles wird zur Laufzeit synthetisiert: keine Audiodateien, kein Download.
+   Alles entsteht zur Laufzeit: keine Audiodateien, kein Download.
+
+   Jedes Stück besteht aus Sektionen (A/B/C), die in einer Reihenfolge
+   gespielt werden — dadurch wiederholt sich nichts alle vier Takte.
    ========================================================================= */
 (function(global){
 'use strict';
 
 /* --------------------------------------------------------------------- */
-/* Tonhöhen-Helfer: "A4" -> 440 Hz                                        */
+/* Noten: "A4" -> 440 Hz.  In den Sequenzen ist "." eine Pause.           */
 /* --------------------------------------------------------------------- */
-var SEMI = {C:0, 'C#':1, D:2, 'D#':3, E:4, F:5, 'F#':6, G:7, 'G#':8, A:9, 'A#':10, B:11};
+var SEMI = {C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
 function hz(note){
-  if(note === null || note === undefined || note === '-') return 0;
-  var m = /^([A-G]#?)(-?\d)$/.exec(note);
+  if(!note || note === '.') return 0;
+  var m = /^([A-G][#b]?)(-?\d)$/.exec(note);
   if(!m) return 0;
   return 440 * Math.pow(2, (SEMI[m[1]] + (parseInt(m[2],10)+1)*12 - 69) / 12);
 }
+function S(str){ return str.trim().split(/\s+/); }
 
 /* --------------------------------------------------------------------- */
-/* Musik-Patterns pro Epoche                                              */
-/* Jede Spur ist ein Array von Sechzehnteln; null = Pause.                */
+/* Musikstücke                                                            */
 /* --------------------------------------------------------------------- */
 var TRACKS = {
 
-  /* 1776 — Cembalo-Menuett, hell und zappelig */
-  past: {
-    bpm: 132, steps: 32,
-    voices: [
-      { type:'triangle', gain:0.16, dur:0.22, oct:0, cut:2600,
-        seq:['D4',null,'F#4',null,'A4',null,'F#4',null,'D4',null,'A4',null,'D5',null,'A4',null,
-             'G4',null,'B4',null,'D5',null,'B4',null,'A4',null,'F#4',null,'D4',null,null,null] },
-      { type:'square', gain:0.055, dur:0.16, oct:0, cut:1800,
-        seq:['D3',null,null,null,'A3',null,null,null,'D3',null,null,null,'A3',null,null,null,
-             'G3',null,null,null,'D3',null,null,null,'A3',null,null,null,'D3',null,null,null] },
-      { type:'triangle', gain:0.05, dur:0.5, oct:0, cut:1200,
-        seq:['D2',null,null,null,null,null,null,null,'D2',null,null,null,null,null,null,null,
-             'G2',null,null,null,null,null,null,null,'A2',null,null,null,null,null,null,null] }
+  /* ---------- Titelbildschirm: geheimnisvoll, etwas feierlich ---------- */
+  title: {
+    bpm:84, order:[0,1],
+    sections:[
+      { voices:[
+        {type:'triangle', gain:0.13, dur:0.9, cut:2400, seq:S(
+          "D4 . . .  A4 . . .  F4 . . .  C5 . . . " +
+          "A#3 . . . F4 . . .  G4 . . .  D4 . . . ")},
+        {type:'sine', gain:0.09, dur:1.6, cut:700, seq:S(
+          "D2 . . .  . . . .   F2 . . .  . . . . " +
+          "A#1 . . . . . . .   G2 . . .  . . . . ")},
+        {type:'sine', gain:0.035, dur:2.6, cut:1400, seq:S(
+          "A4 . . .  . . . .   . . . .   . . . . " +
+          ". . . .   . . . .   . . . .   . . . . ")}
+      ]},
+      { voices:[
+        {type:'triangle', gain:0.12, dur:0.55, cut:2600, seq:S(
+          "D5 . C5 . A#4 . A4 . G4 . F4 . D4 . . . " +
+          "F4 . G4 . A4 . C5 .  D5 . . .  . . . . ")},
+        {type:'sine', gain:0.09, dur:1.6, cut:700, seq:S(
+          "A#1 . . . . . . .   F2 . . .  . . . . " +
+          "G2 . . .  . . . .   D2 . . .  . . . . ")}
+      ]}
     ]
   },
 
-  /* Gegenwart — entspannter Lounge-Groove */
-  present: {
-    bpm: 96, steps: 32,
-    voices: [
-      { type:'sine', gain:0.13, dur:0.62, oct:0, cut:1900,
-        seq:['E4',null,null,null,'G4',null,null,'B4',null,null,'A4',null,null,null,null,null,
-             'D4',null,null,null,'F#4',null,null,'A4',null,null,'G4',null,null,null,null,null] },
-      { type:'triangle', gain:0.10, dur:0.30, oct:0, cut:900,
-        seq:['E2',null,null,null,null,null,'E2',null,'B2',null,null,null,null,null,null,null,
-             'D2',null,null,null,null,null,'D2',null,'A2',null,null,null,null,null,null,null] },
-      { type:'sine', gain:0.045, dur:1.1, oct:0, cut:1400,
-        seq:['B3',null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
-             'A3',null,null,null,null,null,null,null,null,null,null,null,null,null,null,null] }
-    ],
-    drums: [1,0,0,0, 0,0,2,0, 1,0,0,0, 0,0,2,0, 1,0,0,0, 0,0,2,0, 1,0,2,0, 0,0,2,0]
+  /* ---------- 1776: Cembalo-Menuett mit Basso continuo ---------- */
+  past: {
+    bpm:126, order:[0,0,1,2],
+    sections:[
+      { voices:[
+        {type:'triangle', gain:0.15, dur:0.20, cut:3000, seq:S(
+          "D4 . F#4 . A4 . F#4 . D4 . A4 . D5 . A4 . " +
+          "G4 . B4 . D5 . B4 .  A4 . F#4 . D4 . . . ")},
+        {type:'square', gain:0.042, dur:0.14, cut:2000, seq:S(
+          "A4 . . .  D5 . . .  A4 . . .  F#5 . . . " +
+          "B4 . . .  G4 . . .  C#5 . . . D5 . . . ")},
+        {type:'triangle', gain:0.055, dur:0.42, cut:1100, seq:S(
+          "D2 . A2 . D3 . A2 .  D2 . A2 . D3 . A2 . " +
+          "G2 . D3 . G3 . D3 .  A2 . E3 . A2 . . . ")}
+      ]},
+      { voices:[
+        {type:'triangle', gain:0.15, dur:0.20, cut:3000, seq:S(
+          "B4 . D5 . F#5 . D5 . B4 . F#4 . B4 . D5 . " +
+          "E5 . C#5 . A4 . C#5 . B4 . . .  . . . . ")},
+        {type:'square', gain:0.042, dur:0.14, cut:2000, seq:S(
+          "F#4 . . . B4 . . .  D5 . . .  B4 . . . " +
+          "A4 . . .  E4 . . .  F#4 . . . B4 . . . ")},
+        {type:'triangle', gain:0.055, dur:0.42, cut:1100, seq:S(
+          "B1 . F#2 . B2 . F#2 . B1 . F#2 . B2 . F#2 . " +
+          "E2 . B2 . E3 . B2 .   F#2 . C#3 . F#2 . . . ")}
+      ]},
+      { voices:[
+        {type:'triangle', gain:0.13, dur:0.30, cut:2400, seq:S(
+          "G4 . . A4 . . B4 . . . D5 . . . . . " +
+          "C#5 . . . D5 . . .  A4 . . . D4 . . . ")},
+        {type:'triangle', gain:0.05, dur:0.5, cut:1000, seq:S(
+          "G2 . . .  . . . .   D3 . . .  . . . . " +
+          "A2 . . .  . . . .   D2 . . .  . . . . ")}
+      ]}
+    ]
   },
 
-  /* 2200 — dunkler Tentakel-Synth */
+  /* ---------- Gegenwart: Lounge-Groove, Em–C–G–D ---------- */
+  present: {
+    bpm:94, order:[0,0,1,0],
+    sections:[
+      { drums:S("K . . . . . H . S . . . . . H . K . . K . . H . S . . . . H . H"),
+        voices:[
+        {type:'sine', gain:0.115, dur:0.62, cut:2000, seq:S(
+          "E4 . . .  G4 . . B4 . . A4 . . . . . " +
+          "D4 . . .  F#4 . . A4 . . G4 . . . . . ")},
+        {type:'triangle', gain:0.10, dur:0.34, cut:800, seq:S(
+          "E2 . . E2 . . B2 . . . C2 . . . G2 . " +
+          "G2 . . G2 . . D3 . . . D2 . . . A2 . ")},
+        {type:'sine', gain:0.038, dur:1.4, cut:1500, seq:S(
+          "B3 . . .  . . . .  E4 . . .  . . . . " +
+          "D4 . . .  . . . .  A3 . . .  . . . . ")}
+      ]},
+      { drums:S("K . . H . . S . K . H . . . S H K . . H . . S . K . H . S . S ."),
+        voices:[
+        {type:'triangle', gain:0.10, dur:0.30, cut:2600, seq:S(
+          "B4 . A4 . G4 . E4 .  G4 . A4 . B4 . . . " +
+          "D5 . B4 . A4 . G4 .  F#4 . E4 . . . . . ")},
+        {type:'triangle', gain:0.10, dur:0.34, cut:800, seq:S(
+          "C2 . . C2 . . G2 . . . G2 . . . D3 . " +
+          "D2 . . D2 . . A2 . . . E2 . . . B2 . ")},
+        {type:'sine', gain:0.05, dur:0.9, cut:1800, seq:S(
+          "E5 . . .  . . D5 . . . . .  B4 . . . " +
+          ". . . .   A4 . . . . . . .  . . . . ")}
+      ]}
+    ]
+  },
+
+  /* ---------- 2200: dunkler Tentakel-Synth in c-moll ---------- */
   future: {
-    bpm: 108, steps: 32,
-    voices: [
-      { type:'sawtooth', gain:0.075, dur:0.15, oct:0, cut:1300,
-        seq:['C4','G4','D#4','G4','C4','G4','D#4','A#4','C4','G4','D#4','G4','A#3','F4','D4','F4',
-             'C4','G4','D#4','G4','C4','G4','D#4','A#4','G#3','D#4','C4','D#4','A#3','F4','D4','F4'] },
-      { type:'sawtooth', gain:0.11, dur:0.42, oct:0, cut:520,
-        seq:['C2',null,null,null,null,null,null,null,'C2',null,null,null,'A#1',null,null,null,
-             'C2',null,null,null,null,null,null,null,'G#1',null,null,null,'A#1',null,null,null] },
-      { type:'sine', gain:0.05, dur:2.4, oct:0, cut:800,
-        seq:['C3',null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
-             null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null] }
-    ],
-    drums: [1,0,0,0, 0,0,0,0, 2,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0, 2,0,0,0, 0,1,0,1]
+    bpm:112, order:[0,1,0,2],
+    sections:[
+      { drums:S("K . . . . . . . S . . . . . K . K . . . . . . . S . . K . S . S"),
+        voices:[
+        {type:'sawtooth', gain:0.060, dur:0.14, cut:1400, seq:S(
+          "C4 G4 D#4 G4 C4 G4 D#4 A#4 C4 G4 D#4 G4 A#3 F4 D4 F4 " +
+          "C4 G4 D#4 G4 C4 G4 D#4 A#4 G#3 D#4 C4 D#4 A#3 F4 D4 F4")},
+        {type:'sawtooth', gain:0.105, dur:0.40, cut:480, seq:S(
+          "C2 . . .  . . . .  C2 . . .  A#1 . . . " +
+          "C2 . . .  . . . .  G#1 . . . A#1 . . . ")},
+        {type:'sine', gain:0.045, dur:2.6, cut:900, seq:S(
+          "C3 . . .  . . . .  . . . .  . . . . " +
+          ". . . .   . . . .  . . . .  . . . . ")}
+      ]},
+      { drums:S("K . H . . . S . . . K . H . S . K . H . . . S . . H K . S . S H"),
+        voices:[
+        {type:'square', gain:0.072, dur:0.42, cut:2200, seq:S(
+          "G4 . . .  G#4 . . .  A#4 . . . G4 . . . " +
+          "F4 . . .  D#4 . . .  D4 . . .  C4 . . . ")},
+        {type:'sawtooth', gain:0.048, dur:0.14, cut:1200, seq:S(
+          "C4 G4 D#4 G4 C4 G4 D#4 A#4 C4 G4 D#4 G4 A#3 F4 D4 F4 " +
+          "C4 G4 D#4 G4 C4 G4 D#4 A#4 G#3 D#4 C4 D#4 A#3 F4 D4 F4")},
+        {type:'sawtooth', gain:0.105, dur:0.40, cut:480, seq:S(
+          "C2 . . .  . . . .  C2 . . .  A#1 . . . " +
+          "G#1 . . . . . . .  A#1 . . . C2 . . . ")}
+      ]},
+      { drums:S(". . . . . . . . . . . . . . . . K . . . . . . . . . . . S . . ."),
+        voices:[
+        {type:'sine', gain:0.08, dur:1.8, cut:1000, seq:S(
+          "C4 . . .  . . . .  D#4 . . . . . . . " +
+          "G4 . . .  . . . .  A#3 . . . . . . . ")},
+        {type:'sawtooth', gain:0.07, dur:0.9, cut:400, seq:S(
+          "C2 . . .  . . . .  . . . .  . . . . " +
+          "G#1 . . . . . . .  . . . .  . . . . ")}
+      ]}
+    ]
   }
 };
 
@@ -77,42 +164,44 @@ var TRACKS = {
 /* Sound-Engine                                                           */
 /* --------------------------------------------------------------------- */
 var Snd = {
-  ctx:null, master:null, musicBus:null, sfxBus:null,
-  on:true, ready:false,
-  _track:null, _era:null, _step:0, _next:0, _timer:null,
+  ctx:null, master:null, musicBus:null, musicGain:null, sfxBus:null,
+  on:true, ready:false, ducked:false,
+  _track:null, _era:null, _sec:0, _step:0, _next:0, _timer:null,
 
   init:function(){
     if(this.ready) return true;
     var AC = global.AudioContext || global.webkitAudioContext;
     if(!AC) return false;
     try{ this.ctx = new AC(); }catch(e){ return false; }
+    var c = this.ctx;
 
-    this.master = this.ctx.createGain();
+    this.master = c.createGain();
     this.master.gain.value = 0.85;
 
-    // Sanfter Raumklang über eine kurze, synthetische Hallfahne
-    var conv = null;
+    var conv = null;                                  // kurze künstliche Hallfahne
     try{
-      conv = this.ctx.createConvolver();
-      var len = Math.floor(this.ctx.sampleRate * 1.6), buf = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
+      conv = c.createConvolver();
+      var len = Math.floor(c.sampleRate * 1.8), buf = c.createBuffer(2, len, c.sampleRate);
       for(var ch=0; ch<2; ch++){
         var d = buf.getChannelData(ch);
-        for(var i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.6) * 0.5;
+        for(var i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.8) * 0.5;
       }
       conv.buffer = buf;
     }catch(e){ conv = null; }
 
-    this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.55;
-    this.sfxBus   = this.ctx.createGain(); this.sfxBus.gain.value   = 0.85;
+    this.musicGain = c.createGain(); this.musicGain.gain.value = 1.0;   // fürs Ducking
+    this.musicBus  = c.createGain(); this.musicBus.gain.value  = 0.52;
+    this.sfxBus    = c.createGain(); this.sfxBus.gain.value    = 0.85;
 
+    this.musicBus.connect(this.musicGain);
     if(conv){
-      var wet = this.ctx.createGain(); wet.gain.value = 0.22;
+      var wet = c.createGain(); wet.gain.value = 0.24;
       conv.connect(wet); wet.connect(this.master);
-      this.musicBus.connect(conv); this.sfxBus.connect(conv);
+      this.musicGain.connect(conv); this.sfxBus.connect(conv);
     }
-    this.musicBus.connect(this.master);
+    this.musicGain.connect(this.master);
     this.sfxBus.connect(this.master);
-    this.master.connect(this.ctx.destination);
+    this.master.connect(c.destination);
 
     this.ready = true;
     return true;
@@ -120,29 +209,38 @@ var Snd = {
 
   resume:function(){ if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
 
-  /* --- eine Note --- */
+  /* Musik zurücknehmen, solange gesprochen wird */
+  duck:function(on){
+    if(!this.ready) return;
+    this.ducked = !!on;
+    var g = this.musicGain.gain, t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(on ? 0.30 : 1.0, t + (on ? 0.18 : 0.55));
+  },
+
   note:function(freq, when, dur, opts){
     if(!this.ready || !freq) return;
     var o = opts || {}, c = this.ctx;
     var osc = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
     osc.type = o.type || 'sine';
     osc.frequency.setValueAtTime(freq, when);
-    if(o.glide) osc.frequency.exponentialRampToValueAtTime(freq*o.glide, when+dur);
+    if(o.glide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq*o.glide), when+dur);
+    if(o.detune) osc.detune.setValueAtTime(o.detune, when);
     f.type = 'lowpass';
     f.frequency.setValueAtTime(o.cut || 3000, when);
     f.Q.value = o.q || 0.6;
 
     var peak = (o.gain === undefined ? 0.1 : o.gain);
-    var atk  = o.atk === undefined ? 0.012 : o.atk;
+    var atk  = (o.atk  === undefined ? 0.012 : o.atk);
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(Math.max(peak,0.0002), when + atk);
+    g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), when + atk);
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
 
     osc.connect(f); f.connect(g); g.connect(o.bus || this.musicBus);
-    osc.start(when); osc.stop(when + dur + 0.05);
+    osc.start(when); osc.stop(when + dur + 0.06);
   },
 
-  /* --- Rauschimpuls (Percussion / Effekte) --- */
   noise:function(when, dur, opts){
     if(!this.ready) return;
     var o = opts || {}, c = this.ctx;
@@ -153,7 +251,7 @@ var Snd = {
     var f = c.createBiquadFilter();
     f.type = o.filter || 'bandpass';
     f.frequency.setValueAtTime(o.freq || 1200, when);
-    if(o.sweep) f.frequency.exponentialRampToValueAtTime(Math.max(o.sweep,40), when + dur);
+    if(o.sweep) f.frequency.exponentialRampToValueAtTime(Math.max(o.sweep, 40), when + dur);
     f.Q.value = o.q || 1.0;
     var g = c.createGain();
     g.gain.setValueAtTime(o.gain === undefined ? 0.2 : o.gain, when);
@@ -162,15 +260,23 @@ var Snd = {
     src.start(when); src.stop(when + dur + 0.02);
   },
 
-  /* ------------------------- Musik-Sequencer ------------------------- */
-  playEra:function(eraId){
-    if(!this.ready || this._era === eraId) return;
-    this._era = eraId;
-    this._track = TRACKS[eraId] || null;
-    this._step = 0;
-    this._next = this.ctx.currentTime + 0.08;
+  /* ------------------------- Sequencer ------------------------------- */
+  play:function(id){
+    if(!this.ready || this._era === id) return;
+    var wasPlaying = !!this._track;
+    this._era = id;
+    this._track = TRACKS[id] || null;
+    this._sec = 0; this._step = 0;
+    this._next = this.ctx.currentTime + 0.1;
+    if(wasPlaying){                                   // weicher Übergang
+      var g = this.musicBus.gain, t = this.ctx.currentTime;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(0.06, t);
+      g.linearRampToValueAtTime(0.52, t + 1.2);
+    }
     if(!this._timer) this._timer = setInterval(this._tick.bind(this), 40);
   },
+  playEra:function(id){ this.play(id); },
 
   stopMusic:function(){
     if(this._timer){ clearInterval(this._timer); this._timer = null; }
@@ -179,21 +285,27 @@ var Snd = {
 
   _tick:function(){
     if(!this._track || !this.on) return;
-    var t = this._track, spb = 60 / t.bpm / 4;          // Sechzehntel
-    while(this._next < this.ctx.currentTime + 0.25){
-      var s = this._step % t.steps, when = this._next;
-      for(var v=0; v<t.voices.length; v++){
-        var voice = t.voices[v], n = voice.seq[s];
-        if(n) this.note(hz(n), when, voice.dur, {
-          type:voice.type, gain:voice.gain, cut:voice.cut, atk:voice.atk
-        });
+    var T = this._track, spb = 60 / T.bpm / 4;
+    while(this._next < this.ctx.currentTime + 0.28){
+      var sec = T.sections[T.order[this._sec % T.order.length]];
+      var len = sec.voices[0].seq.length;
+      var s = this._step % len, when = this._next;
+
+      for(var v=0; v<sec.voices.length; v++){
+        var voice = sec.voices[v], n = voice.seq[s];
+        if(n && n !== '.') this.note(hz(n), when, voice.dur,
+          {type:voice.type, gain:voice.gain, cut:voice.cut, atk:voice.atk});
       }
-      if(t.drums && t.drums[s]){
-        if(t.drums[s] === 1) this.noise(when, 0.13, {filter:'lowpass', freq:220, sweep:50, gain:0.20, bus:this.musicBus});
-        else                 this.noise(when, 0.06, {filter:'highpass', freq:5200, gain:0.055, bus:this.musicBus});
+      if(sec.drums){
+        var hit = sec.drums[s % sec.drums.length];
+        if(hit === 'K')      this.noise(when, 0.15, {filter:'lowpass', freq:200, sweep:48, gain:0.24, bus:this.musicBus});
+        else if(hit === 'S') this.noise(when, 0.13, {filter:'bandpass', freq:1900, q:0.9, gain:0.11, bus:this.musicBus});
+        else if(hit === 'H') this.noise(when, 0.05, {filter:'highpass', freq:6200, gain:0.048, bus:this.musicBus});
       }
+
       this._next += spb;
       this._step++;
+      if(this._step % len === 0){ this._sec++; this._step = 0; }
     }
   },
 
@@ -201,46 +313,75 @@ var Snd = {
   sfx:function(name){
     if(!this.ready || !this.on) return;
     this.resume();
-    var t = this.ctx.currentTime, B = this.sfxBus;
+    var t = this.ctx.currentTime, B = this.sfxBus, self = this;
     switch(name){
-      case 'pick':                                   // Gegenstand aufgenommen
-        this.note(880, t,      0.09, {type:'square', gain:0.10, cut:4000, bus:B});
-        this.note(1320,t+0.07, 0.14, {type:'square', gain:0.09, cut:5000, bus:B});
+      case 'pick':
+        this.note(880, t,       0.09, {type:'square', gain:0.10, cut:4200, bus:B});
+        this.note(1320, t+0.07, 0.14, {type:'square', gain:0.09, cut:5200, bus:B});
         break;
-      case 'flush':                                  // Chron-o-John
-        this.noise(t, 0.85, {filter:'bandpass', freq:900, sweep:180, q:1.4, gain:0.26, shape:1.1, bus:B});
-        this.note(220, t,     0.5, {type:'sine', gain:0.09, glide:2.6, cut:1400, bus:B});
-        this.note(660, t+0.4, 0.45,{type:'sine', gain:0.07, glide:0.35,cut:2000, bus:B});
+      case 'flush':
+        this.noise(t, 0.95, {filter:'bandpass', freq:950, sweep:170, q:1.4, gain:0.26, shape:1.1, bus:B});
+        this.note(220, t,      0.55, {type:'sine', gain:0.09, glide:2.8, cut:1400, bus:B});
+        this.note(660, t+0.45, 0.50, {type:'sine', gain:0.07, glide:0.32, cut:2000, bus:B});
+        this.note(140, t+0.70, 0.45, {type:'sawtooth', gain:0.05, glide:3.2, cut:900, bus:B});
         break;
       case 'door':
-        this.noise(t, 0.30, {filter:'lowpass', freq:900, sweep:220, gain:0.16, bus:B});
+        this.noise(t, 0.32, {filter:'lowpass', freq:900, sweep:210, gain:0.16, bus:B});
         break;
-      case 'no':                                     // geht nicht
+      case 'no':
         this.note(180, t,      0.13, {type:'square', gain:0.07, cut:1000, bus:B});
-        this.note(140, t+0.11, 0.17, {type:'square', gain:0.07, cut:900,  bus:B});
+        this.note(140, t+0.11, 0.18, {type:'square', gain:0.07, cut:900,  bus:B});
         break;
-      case 'solve':                                  // Rätsel gelöst
+      case 'solve':
         ['C5','E5','G5','C6'].forEach(function(n,i){
-          Snd.note(hz(n), t + i*0.09, 0.30, {type:'triangle', gain:0.13, cut:5200, bus:B});
+          self.note(hz(n), t + i*0.085, 0.34, {type:'triangle', gain:0.13, cut:5400, bus:B});
+        });
+        this.noise(t+0.02, 0.25, {filter:'highpass', freq:3800, gain:0.05, bus:B});
+        break;
+      case 'egg':
+        ['G5','B5','D6','G6'].forEach(function(n,i){
+          self.note(hz(n), t + i*0.06, 0.28, {type:'sine', gain:0.10, cut:6500, bus:B});
         });
         break;
       case 'win':
         ['C4','E4','G4','C5','E5','G5','C6'].forEach(function(n,i){
-          Snd.note(hz(n), t + i*0.13, 0.7, {type:'triangle', gain:0.15, cut:6000, bus:B});
+          self.note(hz(n), t + i*0.13, 0.75, {type:'triangle', gain:0.15, cut:6000, bus:B});
+        });
+        ['C3','C3','G3','C4'].forEach(function(n,i){
+          self.note(hz(n), t + i*0.26, 0.9, {type:'sine', gain:0.10, cut:900, bus:B});
         });
         break;
       case 'zap':
-        this.note(1400, t, 0.22, {type:'sawtooth', gain:0.10, glide:0.18, cut:3000, bus:B});
-        this.noise(t, 0.22, {filter:'highpass', freq:2400, gain:0.10, bus:B});
+        this.note(1400, t, 0.24, {type:'sawtooth', gain:0.10, glide:0.16, cut:3000, bus:B});
+        this.noise(t, 0.24, {filter:'highpass', freq:2400, gain:0.10, bus:B});
         break;
-      case 'squeak':                                 // Hamster
+      case 'squeak':
         this.note(1500, t,      0.07, {type:'square', gain:0.06, cut:6000, bus:B});
         this.note(1900, t+0.06, 0.07, {type:'square', gain:0.06, cut:6000, bus:B});
         break;
       case 'step':
-        this.noise(t, 0.05, {filter:'lowpass', freq:380, gain:0.035, bus:B});
+        this.noise(t, 0.05, {filter:'lowpass', freq:360, gain:0.032, bus:B});
+        break;
+      case 'chicken':
+        [900,1150,760,1320].forEach(function(f,i){
+          self.note(f, t + i*0.09, 0.10, {type:'square', gain:0.075, glide:0.8, cut:3000, bus:B});
+        });
+        break;
+      case 'saber':
+        this.note(110, t, 0.9, {type:'sawtooth', gain:0.07, glide:1.6, cut:700, q:6, bus:B});
+        this.noise(t, 0.9, {filter:'bandpass', freq:420, sweep:900, q:3, gain:0.09, shape:1, bus:B});
         break;
     }
+  },
+
+  /* Die vier Töne eines gewissen Webstuhls */
+  loomTune:function(){
+    if(!this.ready || !this.on) return;
+    var t = this.ctx.currentTime, B = this.sfxBus, self = this;
+    ['E5','D5','F#5','B4'].forEach(function(n,i){
+      self.note(hz(n),   t + i*0.30, 0.85, {type:'sine', gain:0.13, cut:5000, atk:0.05, bus:B});
+      self.note(hz(n)*2, t + i*0.30, 0.55, {type:'sine', gain:0.04, cut:7000, atk:0.05, bus:B});
+    });
   },
 
   toggle:function(){
@@ -251,7 +392,7 @@ var Snd = {
 };
 
 /* --------------------------------------------------------------------- */
-/* Sprachausgabe — Web Speech API, eine Stimmfarbe pro Figur              */
+/* Sprachausgabe                                                          */
 /* --------------------------------------------------------------------- */
 var VOICE_STYLE = {
   bernard:{pitch:1.35, rate:1.08},
@@ -261,7 +402,6 @@ var VOICE_STYLE = {
   npc:    {pitch:0.95, rate:0.98},
   sys:    {pitch:1.00, rate:1.04}
 };
-
 var SPEAKER_ORDER = ['bernard','hoagie','laverne','npc','tent','sys'];
 
 var Voice = {
@@ -271,7 +411,6 @@ var Voice = {
     this.supported = !!(global.speechSynthesis && global.SpeechSynthesisUtterance);
     if(this.supported){
       this._pick();
-      // Stimmen kommen in manchen Browsern erst asynchron
       if(global.speechSynthesis.addEventListener)
         global.speechSynthesis.addEventListener('voiceschanged', this._pick.bind(this));
     }
@@ -282,39 +421,43 @@ var Voice = {
     if(!this.supported) return;
     var vs = global.speechSynthesis.getVoices() || [];
     if(!vs.length) return;
-    // Deutsche Stimmen bevorzugen, sonst nehmen was da ist
     var pool = vs.filter(function(v){ return /^de(-|_|$)/i.test(v.lang || ''); });
     if(!pool.length) pool = vs;
     this._voice = pool[0];
-    // Jede Figur bekommt eine eigene Stimme, solange der Vorrat reicht
     this._byWho = {};
     for(var i=0;i<SPEAKER_ORDER.length;i++)
       this._byWho[SPEAKER_ORDER[i]] = pool[i % pool.length];
     this._picked = true;
   },
 
-  /* Spricht den Text; ruft onEnd auf (auch im Fehlerfall, damit die
-     Untertitel-Warteschlange niemals hängen bleibt).                    */
   speak:function(text, who, onEnd){
-    if(!this.supported || !this.on){ return false; }
+    if(!this.supported || !this.on) return false;
     try{
       global.speechSynthesis.cancel();
       var u = new global.SpeechSynthesisUtterance(
         String(text).replace(/[\[\]]/g,'').replace(/&mdash;|—/g,',')
       );
       var st = VOICE_STYLE[who] || VOICE_STYLE.sys;
-      u.pitch = st.pitch; u.rate = st.rate; u.volume = 1;
-      u.lang = 'de-DE';
+      u.pitch = st.pitch; u.rate = st.rate; u.volume = 1; u.lang = 'de-DE';
       var v = this._byWho[who] || this._voice;
       if(v) u.voice = v;
-      var done = false, finish = function(){ if(done) return; done = true; if(onEnd) onEnd(); };
+      var done = false, finish = function(){
+        if(done) return;
+        done = true;
+        Snd.duck(false);
+        if(onEnd) onEnd();
+      };
       u.onend = finish; u.onerror = finish;
+      Snd.duck(true);
       global.speechSynthesis.speak(u);
       return true;
-    }catch(e){ return false; }
+    }catch(e){ Snd.duck(false); return false; }
   },
 
-  shutUp:function(){ if(this.supported){ try{ global.speechSynthesis.cancel(); }catch(e){} } },
+  shutUp:function(){
+    if(this.supported){ try{ global.speechSynthesis.cancel(); }catch(e){} }
+    Snd.duck(false);
+  },
 
   toggle:function(){
     this.on = !this.on;
@@ -325,5 +468,4 @@ var Voice = {
 
 global.Snd = Snd;
 global.Voice = Voice;
-
 })(window);

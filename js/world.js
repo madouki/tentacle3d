@@ -55,7 +55,8 @@ W.ROOM_LABEL = {
   yard:   {past:'Vor dem Rohbau, 1776', present:'Vor der Villa',    future:'Vor dem Tentakel-Turm'},
   kitchen:{past:'Küche, 1776',          present:'Küche',            future:'Nährschlamm-Kantine'},
   lab:    {past:'Werkstatt, 1776',      present:'Dr. Freds Labor',  future:'Kommandozentrale'},
-  attic:  {past:'Dachstuhl, 1776',      present:'Dachboden',        future:'Museum der Menschheit'}
+  attic:  {past:'Dachstuhl, 1776',      present:'Dachboden',        future:'Museum der Menschheit'},
+  cellar: {past:'Weinkeller, 1776',     present:'Keller',           future:'Archivschacht'}
 };
 
 W.ITEMS = {
@@ -74,7 +75,9 @@ W.ITEMS = {
   hamster: {name:'Hamster',      ic:'\u{1F439}',
             desc:'Ein flauschiger Hamster. Er heißt laut Käfigschild "Chuck" und ist erstaunlich energiegeladen.'},
   costume: {name:'Tentakelkostüm', ic:'\u{1F991}',
-            desc:'Ein lila Tentakelkostüm aus dem Museum. Kratzt entsetzlich, täuscht dafür jede Wache.'}
+            desc:'Ein lila Tentakelkostüm aus dem Museum. Kratzt entsetzlich, täuscht dafür jede Wache.'},
+  chicken: {name:'Gummihuhn',    ic:'\u{1F414}',
+            desc:'Ein Gummihuhn mit einer Rolle in der Mitte. Frag besser nicht. Es funktioniert einfach.'}
 };
 
 /* ======================================================================
@@ -82,7 +85,8 @@ W.ITEMS = {
    ====================================================================== */
 var RW = 20, RD = 12;
 W.BOUND = {x:8.6, zMin:-4.0, zMax:4.8};
-W.ATTIC_BOUND = {x:6.4, zMin:-3.2, zMax:3.4};
+W.ATTIC_BOUND  = {x:6.4, zMin:-3.2, zMax:3.4};
+W.CELLAR_BOUND = {x:7.4, zMin:-3.6, zMax:4.6};
 
 /* ======================================================================
    Hilfsfunktionen für den Aufbau
@@ -363,6 +367,13 @@ function buildYard(era, S, g, HS, A){
         A.say('"Das habe ich mir eben ausgedacht. Klingt aber gut, nicht wahr?"','npc');
         if(!S.f.treePlanted)
           A.say('"Und pflanzt endlich jemand einen Baum an die Hauswand! Ich will Schatten, keinen Stumpf."','npc');
+        if(!S.f.eggInsult){
+          A.setQuiet('eggInsult', true);
+          A.egg('monkey-insult');
+          A.say('"Uebrigens: Ihr kaempft wie ein dummer Bauer."','npc');
+          A.say('"Wie passend. Ihr kaempft wie eine Kuh."','hoagie');
+          A.say('"...das war unerwartet gut. Guten Tag."','npc');
+        }
         return null;
       },
       take:function(){ return 'Gründerväter nimmt man nicht mit. Steht so in der Verfassung. Vermutlich.'; }
@@ -523,6 +534,10 @@ function buildYard(era, S, g, HS, A){
   var deco = era === 'future' ? 0x5f4a7a : (era === 'past' ? 0x3f7a30 : 0x35702c);
   var t1 = M.tree(deco); t1.position.set(-11.5, 0, 3.2); g.add(t1);
   var t2 = M.tree(deco); t2.position.set(12.6, 0, 4.6); g.add(t2);
+  g.add(M.clouds(7, era === 'future' ? 0x6a4a8c : 0xf4f6fa, 16, 70));
+  g.add(M.birds(era === 'future' ? 2 : 4, era === 'future' ? 0x2a1a3a : 0x2e2e34));
+
+  placeEggs('yard', era, S, g, HS, A);
 }
 
 /* ------------------------------------------------------------- KÜCHE */
@@ -743,6 +758,8 @@ function buildKitchen(era, S, g, HS, A){
       look:function(){ return '"MENSCH DER WOCHE" — darunter ein leerer Rahmen und ein Zettel: "Bewerbungen bitte an die Verwaltung."'; }
     });
   }
+
+  placeEggs('kitchen', era, S, g, HS, A);
 }
 
 /* --------------------------------------------------------------- LABOR */
@@ -752,6 +769,16 @@ function buildLab(era, S, g, HS, A){
 
   HS('Tür zur Küche', M.box(2.2,3.6,0.5, 0x2a1a10, -7.4, 1.8, -5.8), -7.4, -2.9,
     {primary:'door', door:'kitchen', look:function(){ return 'Zurück in die Küche.'; }});
+
+  var hatch = M.grp(-7.0, 0, 3.2);
+  hatch.add(M.box(2.4,0.22,2.4, 0x4a3520, 0, 0.11, 0));
+  hatch.add(M.box(2.0,0.30,2.0, 0x1a1220, 0, 0.04, 0, {noShadow:true}));
+  hatch.add(M.box(2.5,0.16,0.5, 0x6a4a2a, 0, 0.30, 1.2));
+  hatch.add(M.cyl(0.14,0.14,0.10, 0xb08a40, 0.8, 0.22, 0, 10));
+  HS('Kellerluke', hatch, -6.0, 3.0, {
+    primary:'door', door:'cellar',
+    look:function(){ return 'Eine offene Luke im Boden. Darunter fuehrt eine Treppe in den Keller.'; }
+  });
 
   var cj = M.chronoJohn(era);
   cj.position.set(5.6, 0, -2.4);
@@ -973,6 +1000,8 @@ function buildLab(era, S, g, HS, A){
       use:function(){ return 'Laverne drückt wahllos Knöpfe. Ein Monitor zeigt jetzt Katzenvideos aus dem Jahr 2020.'; }
     });
   }
+
+  placeEggs('lab', era, S, g, HS, A);
 }
 
 /* ----------------------------------------------------------- DACHBODEN */
@@ -1166,10 +1195,13 @@ function buildAttic(era, S, g, HS, A){
       look:function(){ return 'Hier oben ist noch gar nichts. Nur Balken, Himmel und ein sehr weiter Blick nach unten.'; }
     });
   }
+
+  placeEggs('attic', era, S, g, HS, A);
 }
 
 /* ---------------------------------------------------------------------- */
-W.BUILDERS = {yard:buildYard, kitchen:buildKitchen, lab:buildLab, attic:buildAttic};
+W.BUILDERS = {yard:buildYard, kitchen:buildKitchen, lab:buildLab,
+              attic:buildAttic, cellar:buildCellar};
 
 /* Erreichbarkeit: Der Dachboden hängt am Baum. */
 W.canEnter = function(room, era, S){
@@ -1178,6 +1210,302 @@ W.canEnter = function(room, era, S){
   if(era === 'past')   return false;
   return true;
 };
+
+
+/* ======================================================================
+   KELLER — der fünfte Raum, erreichbar über eine Luke im Labor
+   ====================================================================== */
+function shellCellar(g, E, era){
+  var floorTex = M.tex.concrete(era === 'future' ? '#1a1226' : '#4a3524', 5);
+  var fl = new THREE.Mesh(new THREE.BoxGeometry(17, 0.4, 20), M.mat(0xffffff,{map:floorTex}));
+  fl.position.set(0,-0.2,2); fl.receiveShadow = true; fl.userData.floor = true;
+  g.add(fl);
+
+  var wallTex = M.tex.bricks(era === 'future' ? '#2e1f44' : '#6b5236',
+                             era === 'future' ? '#180f28' : '#4a3826', 5);
+  var back = new THREE.Mesh(new THREE.BoxGeometry(18, 12, 0.4), M.mat(0xffffff,{map:wallTex}));
+  back.position.set(0, 6.0, -5.6); back.receiveShadow = true; g.add(back);
+
+  var side = new THREE.Mesh(new THREE.BoxGeometry(0.4, 12, 22), M.mat(0xffffff,{map:wallTex}));
+  side.position.set(-8.5, 6.0, 4); side.receiveShadow = true; g.add(side);
+  var side2 = side.clone(); side2.position.x = 8.5; g.add(side2);
+
+  // Keine geschlossene Decke: die Kamera blickt von schräg oben in den Keller.
+  // Stattdessen ein dunkler Deckenstreifen weit hinten, damit oben nichts durchscheint.
+  g.add(M.box(17, 0.4, 8, E.wallMortar, 0, 8.6, -3.0, {noShadow:true}));
+
+  // Gewölbebögen
+  for(var a=-1;a<=1;a++){
+    var arc = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.34, 8, 18, Math.PI),
+      M.mat(E.wallA));
+    arc.position.set(a*5.4, 3.6, -5.2);
+    arc.material.color.set(era === 'future' ? '#3d2b58' : '#8a6f4a');
+    arc.castShadow = true;
+    g.add(arc);
+    g.add(M.box(0.7,3.7,0.7, E.wallA, a*5.4-2.5, 1.85, -5.2));
+    g.add(M.box(0.7,3.7,0.7, E.wallA, a*5.4+2.5, 1.85, -5.2));
+  }
+
+  g.add(M.dust(200, 15, 0xcfc0a0));
+  return fl;
+}
+
+function buildCellar(era, S, g, HS, A){
+  var E = W.ERAS[era];
+  shellCellar(g, E, era);
+
+  HS('Treppe nach oben', M.box(3.0,0.5,2.6, 0x4a3520, 6.4, 0.12, 3.4), 5.4, 3.0, {
+    primary:'door', door:'lab',
+    look:function(){ return 'Eine steile Treppe zurück nach oben.'; }
+  });
+  // Stufen als Deko
+  for(var st=0; st<5; st++)
+    g.add(M.box(3.0,0.28,0.55, 0x5a4530, 6.4, 0.14+st*0.28, 4.4+st*0.55));
+
+  // Kellerlampe
+  var lamp = new THREE.PointLight(era === 'future' ? 0x49e6a0 : 0xffcc88, 1.25, 15);
+  lamp.position.set(0, 5.6, 0);
+  lamp.name = 'cellarLamp';
+  g.add(lamp);
+  g.add(M.cyl(0.4,0.5,0.3, 0x3a3a40, 0, 5.9, 0, 12, {noShadow:true}));
+  g.add(M.ball(0.24, era === 'future' ? 0x49e6a0 : 0xffdd99, 0, 5.6, 0,
+    {emissive: era === 'future' ? 0x1f8a5e : 0x8a6a20, noShadow:true}));
+
+  if(era === 'past'){
+    var barrels = M.grp(-5.0, 0, -1.6);
+    for(var b=0;b<3;b++){
+      var br = M.cyl(0.85,0.72,1.7, 0x7a5530, (b%2)*1.9, 0.85, (b>1?1.7:0), 14);
+      barrels.add(br);
+      barrels.add(M.cyl(0.88,0.88,0.10, 0x4a3520, (b%2)*1.9, 0.45, (b>1?1.7:0), 14));
+      barrels.add(M.cyl(0.88,0.88,0.10, 0x4a3520, (b%2)*1.9, 1.25, (b>1?1.7:0), 14));
+    }
+    HS('Weinfässer', barrels, -4.2, 0.6, {
+      primary:'look',
+      look:function(){ return 'Drei Fässer. Auf einem steht mit Kreide: "1776 — nicht anfassen, wird noch was."'; },
+      use:function(item){
+        if(item === 'wine') return 'Eine einzelne Flasche unter drei Fässern verstecken? Da findet sie nie jemand wieder.';
+        return 'Hoagie klopft gegen das Holz. Klingt voll. Sehr voll.';
+      }
+    });
+
+    var shelf = M.grp(3.4, 0, -4.8);
+    shelf.add(M.box(4.4,0.2,1.1, 0x6b4a2a, 0, 1.1, 0));
+    shelf.add(M.box(4.4,0.2,1.1, 0x6b4a2a, 0, 2.3, 0));
+    shelf.add(M.box(0.2,2.5,1.1, 0x6b4a2a, -2.1, 1.25, 0));
+    shelf.add(M.box(0.2,2.5,1.1, 0x6b4a2a,  2.1, 1.25, 0));
+    HS('Vorratsregal', shelf, 3.4, -2.6, {
+      primary:'look',
+      look:function(){ return 'Ein Regal voller Einmachgläser. Der Inhalt ist überwiegend braun und überwiegend fragwürdig.'; }
+    });
+  }
+
+  if(era === 'present'){
+    var boiler = M.grp(-4.6, 0, -3.8);
+    boiler.add(M.cyl(1.3,1.3,4.0, 0x5a5f66, 0, 2.0, 0, 16));
+    boiler.add(M.cyl(1.45,1.45,0.3, 0x44484e, 0, 0.15, 0, 16));
+    boiler.add(M.cyl(1.45,1.45,0.3, 0x44484e, 0, 3.9, 0, 16));
+    boiler.add(M.cyl(0.3,0.3,2.6, 0x6a7078, 1.5, 3.4, 0, 10));
+    boiler.add(M.box(0.7,0.7,0.2, 0x1a1e24, 0, 2.2, 1.32, {emissive:0x331100}));
+    boiler.add(M.ball(0.22, 0xff7733, 0, 2.2, 1.40, {emissive:0x992200, noShadow:true}));
+    HS('Heizkessel', boiler, -4.0, -1.8, {
+      primary:'look',
+      look:function(){ return 'Ein Heizkessel, der bedrohlich blubbert. Ein handgeschriebenes Schild warnt: "Nicht über 8 stellen. Nie wieder."'; },
+      use:function(item){
+        if(item) return 'Da hinein wirft Bernard ganz sicher nichts.';
+        A.sfx('no');
+        return 'Bernard lässt die Finger davon. Sehr vernünftig.';
+      }
+    });
+
+    var junk = M.grp(3.0, 0, -1.0);
+    junk.add(M.box(2.0,1.0,1.4, 0x7a6a58, 0, 0.5, 0));
+    junk.add(M.box(1.4,0.9,1.0, 0x6a5a48, 0.4, 1.45, 0.2));
+    junk.add(M.cyl(0.5,0.5,1.2, 0x8a7a68, -1.2, 0.6, 0.6, 12));
+    HS('Gerümpelhaufen', junk, 3.0, 1.0, {
+      primary:'use',
+      look:function(){ return 'Ein Berg aus Dingen, die Dr. Fred "später bestimmt noch braucht". Der Staub sagt etwas anderes.'; },
+      use:function(item){
+        if(item) return 'Das kommt nicht auf den Haufen, sonst findet es nie wieder jemand.';
+        return 'Bernard wühlt kurz. Eine Rechnung von 1987, ein Schuh, ein Kabel ohne Enden.';
+      }
+    });
+  }
+
+  if(era === 'future'){
+    /* Bonus: Schacht mit Stromkabel — Gummihuhn öffnet das Geheimfach */
+    var pit = M.grp(-3.6, 0, 0.4);
+    pit.add(M.box(5.0,0.3,3.4, 0x120c1c, 0, 0.02, 0, {noShadow:true}));
+    pit.add(M.box(5.4,0.3,0.4, 0x3a2a52, 0, 0.16, 1.9));
+    pit.add(M.box(5.4,0.3,0.4, 0x3a2a52, 0, 0.16,-1.9));
+    var cable = M.cyl(0.06,0.06,5.6, 0x49e6a0, 0, 3.2, 0, 8, {emissive:0x1f8a5e});
+    cable.rotation.z = Math.PI/2;
+    cable.name = 'cellarCable';
+    pit.add(cable);
+    HS('Wartungsschacht', pit, -3.6, 2.6, {
+      primary:'use',
+      look:function(){
+        return S.f.secretOpen
+          ? 'Der Schacht. Auf der anderen Seite steht das Geheimfach offen.'
+          : 'Ein tiefer Wartungsschacht. Darüber spannt sich ein Stromkabel zur anderen Seite — dort ist eine Wandnische. Springen wäre unklug.';
+      },
+      use:function(item){
+        if(S.f.secretOpen) return 'Laverne war schon drüben. Einmal reicht.';
+        if(item === 'chicken'){
+          A.set('secretOpen', true); A.sfx('chicken'); A.sfx('solve');
+          A.say('Laverne hängt das Gummihuhn mit der Rolle über das Kabel und rutscht hinüber.');
+          A.say('"Ein Gummihuhn mit einer Rolle in der Mitte. Natürlich. Warum auch nicht."','laverne');
+          A.say('Drüben öffnet sich eine Wandnische.','sys');
+          return null;
+        }
+        if(item) return 'Damit kommt Laverne nicht über den Schacht.';
+        A.sfx('no');
+        return 'Zu weit zum Springen. Über dem Schacht hängt aber ein Kabel — man bräuchte etwas zum Darüberrutschen.';
+      },
+      take:function(){ return 'Der Schacht bleibt, wo er ist.'; }
+    });
+
+    if(S.f.secretOpen){
+      var niche = M.grp(-7.4, 0, -3.0);
+      niche.add(M.box(2.2,2.6,0.6, 0x1a1226, 0, 1.5, 0));
+      var ape = M.grp(0, 0.4, 0.3);
+      ape.add(M.box(0.7,0.9,0.5, 0x5a4330, 0, 0.45, 0));
+      ape.add(M.ball(0.24, 0x6a5340, -0.28, 1.05, 0));
+      ape.add(M.ball(0.24, 0x6a5340,  0.00, 1.20, 0));
+      ape.add(M.ball(0.24, 0x6a5340,  0.28, 1.05, 0));
+      ape.name = 'threeHeaded';
+      niche.add(ape);
+      HS('Wandnische', niche, -6.4, -1.4, {
+        primary:'look', egg:'monkey-ape',
+        look:function(){
+          return 'In der Nische steht eine kleine Statue: ein Affe mit drei Köpfen. Auf dem Sockel steht "Sieht man selten."';
+        }
+      });
+    }
+
+    var rack = M.grp(3.6, 0, -4.4);
+    for(var r=0;r<3;r++){
+      rack.add(M.box(4.6,0.18,1.2, 0x3d2a58, 0, 1.0+r*1.3, 0));
+      for(var d2=0; d2<6; d2++)
+        rack.add(M.box(0.22,0.9,0.9, d2%2 ? 0x49e6a0 : 0x7a5aa8, -1.9+d2*0.76, 1.55+r*1.3, 0,
+          {emissive: d2%2 ? 0x14523a : 0x000000}));
+    }
+    HS('Datenarchiv', rack, 3.6, -2.4, {
+      primary:'look',
+      look:function(){ return 'Das Archiv der Tentakelverwaltung. Die Beschriftungen reichen von "Akte 1" bis "Akte 9.400.112".'; },
+      use:function(){ return 'Laverne zieht eine Akte heraus: "Beschwerden über Nährschlamm, Band 12 von 4000."'; }
+    });
+  }
+
+  placeEggs('cellar', era, S, g, HS, A);
+}
+
+/* ======================================================================
+   Versteckte Anspielungen — zentral gepflegt, in den Räumen verteilt
+   ====================================================================== */
+W.EGGS = [
+  { id:'maniac-meteor', room:'cellar', era:'present', name:'Alter Meteorit',
+    x:-1.0, z:2.6, wx:-1.0, wz:4.0, make:function(){ return M.meteor(); },
+    look:'Ein purpurroter Meteorit im Keller. Er summt leise und wirkt beleidigt. Auf einem Zettel daneben: "Zurück in den Swimmingpool? — F."' },
+
+  { id:'loom-wheel', room:'cellar', era:'past', name:'Spinnrad',
+    x:6.6, z:-2.0, wx:5.6, wz:-1.0, make:function(){ return M.loomWheel(); },
+    look:'Ein Spinnrad mit acht kleinen Kerben, jede in einem anderen Ton gestimmt. Hoagie schlägt vier davon an — E, D, Fis, H — und irgendwo öffnet sich vermutlich etwas.',
+    act:function(A){ A.sfx('loom'); } },
+
+  { id:'monkey-chicken', room:'cellar', era:'past', name:'Gummihuhn',
+    x:1.0, z:1.6, wx:1.0, wz:3.0, make:function(){ return M.rubberChicken(); },
+    look:'Ein Gummihuhn mit einer Rolle in der Mitte. In einem Keller von 1776. Dafür gibt es keine vernünftige Erklärung — und Hoagie sucht auch keine.',
+    take:'chicken' },
+
+  { id:'fullthrottle-helmet', room:'cellar', era:'present', name:'Motorradhelm',
+    x:5.4, z:0.6, wx:5.0, wz:2.0, make:function(){ return M.helmet(); },
+    look:'Ein zerkratzter Motorradhelm mit rotem Streifen. Innen klebt ein Aufkleber: "Wenn du das lesen kannst, ist deine Maschine kaputt."' },
+
+  { id:'starwars-saber', room:'cellar', era:'future', name:'Metallgriff',
+    x:6.8, z:1.4, wx:5.8, wz:2.2, make:function(){
+      var g = M.grp();
+      g.add(M.cyl(0.11,0.11,0.62, 0x9aa2a8, 0, 0.31, 0, 14));
+      g.add(M.cyl(0.13,0.13,0.09, 0x1a1e24, 0, 0.42, 0, 14));
+      g.add(M.box(0.06,0.06,0.10, 0xcc2222, 0.11, 0.24, 0, {emissive:0x661111}));
+      g.add(M.box(0.9,0.12,0.7, 0x2a1c3c, 0, 0.03, 0));
+      return g;
+    },
+    look:'Ein polierter Metallgriff mit einem roten Knopf. Laverne drückt ihn. Ein tiefes Summen, ein Lichtstreifen — und ein Loch in der Kellerdecke. Sie legt ihn schnell wieder hin.',
+    act:function(A){ A.sfx('saber'); } },
+
+  { id:'starwars-carbonite', room:'attic', era:'future', name:'Karbonitblock',
+    x:5.0, z:-3.2, wx:4.4, wz:-1.6, make:function(){ return M.carbonite(); },
+    look:'Ein Metallblock mit dem Abdruck eines Mannes darin. Das Museumsschild sagt: "Mensch, tiefgekühlt. Fundort unbekannt. Wirkt unzufrieden."' },
+
+  { id:'zak-squirrel', room:'attic', era:'future', name:'Präparat im Glas',
+    x:-5.6, z:0.4, wx:-4.8, wz:1.4, make:function(){ return M.squirrel(); },
+    look:'Ein ausgestopftes zweiköpfiges Eichhörnchen unter Glas. Schild: "Häufigstes Säugetier des 20. Jahrhunderts. Quelle: ein Boulevardblatt."' },
+
+  { id:'sammax-plushies', room:'attic', era:'present', name:'Zwei Plüschtiere',
+    x:-2.4, z:1.8, wx:-2.4, wz:2.8, make:function(){ return M.plushies(); },
+    look:'Ein Plüschhase mit sehr wachem Blick und ein Hund mit Detektivhut. Aus dem Hasen fällt ein Zettel: "Wir sind Freelance Police. Anfragen bitte schriftlich."' },
+
+  { id:'indy-fedora', room:'attic', era:'present', name:'Hut und Peitsche',
+    x:4.2, z:0.6, wx:3.6, wz:1.8, make:function(){ return M.fedoraSet(); },
+    look:'Ein brauner Filzhut und eine aufgerollte Peitsche. Im Hutfutter steht: "Gehört in ein Museum." Jemand hat darunter gekritzelt: "In vierhundert Jahren dann."' },
+
+  { id:'monkey-grog', room:'kitchen', era:'past', name:'Zinnkrug',
+    x:-4.6, z:1.4, wx:-4.0, wz:2.4, make:function(){ return M.grogMug(); },
+    look:'In dem Krug schwappt etwas Grünes, das langsam den Zinnboden zerfrisst. Hoagie schnuppert. "Das löst Metall auf. Das trinken die hier freiwillig?"' },
+
+  { id:'monkey-insult', room:'yard', era:'past', name:'Fechtender Gründervater', dialogue:true,
+    look:'' },
+
+  { id:'grim-flowers', room:'kitchen', era:'future', name:'Vertrockneter Strauß',
+    x:-6.2, z:2.2, wx:-5.4, wz:3.0, make:function(){
+      var g = M.grp();
+      g.add(M.cyl(0.22,0.16,0.42, 0xb08a5c, 0, 0.21, 0, 12));
+      for(var i=0;i<5;i++){
+        var st = M.cyl(0.03,0.03,0.7, 0x5a6a3a, (i-2)*0.09, 0.72, 0, 6);
+        st.rotation.z = (i-2)*0.16; g.add(st);
+        g.add(M.ball(0.12, i%2 ? 0xd8a040 : 0xc06a80, (i-2)*0.2, 1.06, 0));
+      }
+      return g;
+    },
+    look:'Ein vertrockneter Blumenstrauß in einer Vase. Das Kärtchen: "Für den Tag, an dem wieder etwas wächst." Eine der Blumen sieht aus wie aus Papier gefaltet.' }
+];
+
+function placeEggs(room, era, S, g, HS, A){
+  W.EGGS.forEach(function(egg){
+    if(egg.room !== room || egg.era !== era) return;
+    if(egg.dialogue || !egg.make) return;
+    if(egg.take && S.f['egg_taken_' + egg.id]) return;
+    var obj = egg.make();
+    obj.position.set(egg.x, 0, egg.z);
+    HS(egg.name, obj, egg.wx, egg.wz, {
+      primary: egg.take ? 'take' : 'look',
+      egg: egg.id,
+      look:function(){
+        A.egg(egg.id);
+        if(egg.act) egg.act(A);
+        return egg.look;
+      },
+      take:function(){
+        A.egg(egg.id);
+        if(egg.take){
+          S.f['egg_taken_' + egg.id] = true;
+          A.give(A.who(), egg.take);
+          A.sfx('pick');
+          A.say(egg.look);
+          A.rebuildSoon();
+          return null;
+        }
+        return 'Das lässt ' + W.CHARS[A.who()].name + ' lieber liegen.';
+      },
+      use:function(item){
+        if(item) return 'Das passt nicht zusammen.';
+        A.egg(egg.id);
+        if(egg.act) egg.act(A);
+        return egg.look;
+      }
+    });
+  });
+}
 
 global.World = W;
 })(window);

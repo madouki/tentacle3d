@@ -208,6 +208,11 @@ M.actor = function(cfg){
   head.add(eyeL); head.add(eyeR);
   head.add(M.ball(0.042,0x101010,-0.155,0.045,0.345));
   head.add(M.ball(0.042,0x101010, 0.155,0.045,0.345));
+  var lidL = M.box(0.20,0.20,0.02,cfg.skin,-0.155,0.045,0.352,{noShadow:true});
+  var lidR = M.box(0.20,0.20,0.02,cfg.skin, 0.155,0.045,0.352,{noShadow:true});
+  lidL.scale.y = lidR.scale.y = 0.02;
+  lidL.userData.noOutline = lidR.userData.noOutline = true;
+  head.add(lidL); head.add(lidR);
   head.add(M.box(0.20,0.035,0.05,cfg.hair,-0.155,0.155,0.29));      // Brauen
   head.add(M.box(0.20,0.035,0.05,cfg.hair, 0.155,0.155,0.29));
 
@@ -235,7 +240,9 @@ M.actor = function(cfg){
   }
   g.add(head);
 
-  g.userData.parts = {legL:legL, legR:legR, armL:armL, armR:armR, head:head, torso:torso};
+  g.userData.parts = {legL:legL, legR:legR, armL:armL, armR:armR, head:head, torso:torso,
+                      lidL:lidL, lidR:lidR};
+  g.userData.blinkIn = 2 + Math.random()*3;
   M.outline(g, 0.05);
   return g;
 };
@@ -368,6 +375,231 @@ M.dust = function(count, spread, color){
   }));
   pts.name = 'dust';
   return pts;
+};
+
+
+/* ======================================================================
+   6. Atmosphäre: Kontaktschatten, Wolken, Vögel, Funken
+   ====================================================================== */
+
+/* Weicher Schattenfleck unter Figuren und Möbeln — verankert sie im Boden */
+M.blob = function(radius, opacity){
+  var cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  var c = cv.getContext('2d');
+  var g = c.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,   'rgba(0,0,0,0.55)');
+  g.addColorStop(0.55,'rgba(0,0,0,0.22)');
+  g.addColorStop(1,   'rgba(0,0,0,0)');
+  c.fillStyle = g; c.fillRect(0,0,64,64);
+  var m = new THREE.Mesh(
+    new THREE.PlaneGeometry(radius*2, radius*2),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv), transparent:true,
+                                 opacity:opacity === undefined ? 0.85 : opacity,
+                                 depthWrite:false})
+  );
+  m.rotation.x = -Math.PI/2;
+  m.position.y = 0.03;
+  m.userData.noOutline = true;
+  m.renderOrder = 1;
+  return m;
+};
+
+/* Wolkenbank am Himmel */
+M.clouds = function(count, color, y, spread){
+  var g = M.grp();
+  g.name = 'clouds';
+  for(var i=0;i<count;i++){
+    var c = M.grp((Math.random()-0.5)*spread, y + Math.random()*8, -20 - Math.random()*26);
+    var n = 3 + (Math.random()*3|0);
+    for(var b=0;b<n;b++){
+      var puff = M.ball(1.6 + Math.random()*1.8, color,
+        (b-n/2)*2.1, Math.random()*0.9, Math.random()*1.4,
+        {opacity:0.85, noShadow:true});
+      puff.receiveShadow = false;
+      c.add(puff);
+    }
+    c.userData.drift = 0.12 + Math.random()*0.25;
+    g.add(c);
+  }
+  return g;
+};
+
+/* Ein paar Vögel, die ihre Bahn ziehen */
+M.birds = function(count, color){
+  var g = M.grp();
+  g.name = 'birds';
+  for(var i=0;i<count;i++){
+    var b = M.grp();
+    var wl = M.box(0.9,0.05,0.22,color,-0.45,0,0,{noShadow:true});
+    var wr = M.box(0.9,0.05,0.22,color, 0.45,0,0,{noShadow:true});
+    wl.userData.noOutline = wr.userData.noOutline = true;
+    b.add(wl); b.add(wr);
+    b.userData.wings = [wl,wr];
+    b.userData.t  = Math.random()*Math.PI*2;
+    b.userData.r  = 16 + Math.random()*10;
+    b.userData.h  = 13 + Math.random()*6;
+    b.userData.sp = 0.10 + Math.random()*0.09;
+    g.add(b);
+  }
+  return g;
+};
+
+/* Funkenflug, etwa am Chron-o-John */
+M.sparks = function(count, color){
+  var geo = new THREE.BufferGeometry();
+  var pos = new Float32Array(count*3);
+  for(var i=0;i<count;i++){
+    pos[i*3]   = (Math.random()-0.5)*2.2;
+    pos[i*3+1] = Math.random()*4.5;
+    pos[i*3+2] = (Math.random()-0.5)*2.2;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  var p = new THREE.Points(geo, new THREE.PointsMaterial({
+    color:color || 0x9fe4ff, size:0.11, transparent:true, opacity:0.85,
+    depthWrite:false, sizeAttenuation:true
+  }));
+  p.name = 'sparks';
+  return p;
+};
+
+/* ======================================================================
+   7. Requisiten für die versteckten Anspielungen
+   ====================================================================== */
+
+/* Ein in Karbonit eingefrorener Schmuggler */
+M.carbonite = function(){
+  var g = M.grp();
+  g.add(M.box(1.9,3.4,0.5, 0x4a4f56, 0, 1.7, 0));
+  g.add(M.box(1.6,0.5,0.62, 0x5a6068, 0, 2.9, 0.06));
+  g.add(M.box(0.5,1.0,0.30, 0x6a7078, 0, 2.05, 0.22));
+  g.add(M.box(0.26,0.9,0.24, 0x6a7078, -0.44, 1.55, 0.20));
+  g.add(M.box(0.26,0.9,0.24, 0x6a7078,  0.44, 1.55, 0.20));
+  g.add(M.box(0.34,0.34,0.26, 0x6a7078, 0, 2.62, 0.20));
+  for(var i=0;i<4;i++)
+    g.add(M.box(0.16,0.16,0.12, 0xff5533, -0.7+i*0.47, 0.42, 0.30,
+      {emissive:0x882211, noShadow:true}));
+  return g;
+};
+
+/* Gummihuhn mit einer Rolle in der Mitte */
+M.rubberChicken = function(){
+  var g = M.grp();
+  g.add(M.ball(0.26, 0xf2d24a, 0, 0, 0));
+  g.add(M.ball(0.15, 0xf2d24a, 0.05, 0.30, 0.10));
+  g.add(M.cone(0.07, 0.16, 0xe08a20, 0.05, 0.34, 0.24, 8));
+  g.add(M.box(0.30,0.14,0.16, 0xf2d24a, -0.22, -0.06, 0));
+  g.add(M.cyl(0.13,0.13,0.09, 0x9aa2a8, 0, 0.02, 0, 12));
+  g.add(M.cyl(0.05,0.05,0.16, 0x6a7078, 0, 0.02, 0, 8));
+  return g;
+};
+
+/* Ein sehr alter Meteorit */
+M.meteor = function(){
+  var g = M.grp();
+  var m = M.ball(0.85, 0x8a3a2a, 0, 0.6, 0, {emissive:0x4a1208});
+  m.name = 'meteorBody';
+  g.add(m);
+  g.add(M.ball(0.45, 0x9a4a30, 0.62, 0.42, 0.2, {emissive:0x3a1006}));
+  g.add(M.ball(0.34, 0x7a2e22,-0.55, 0.5,-0.25, {emissive:0x3a1006}));
+  g.add(M.box(1.9,0.22,1.7, 0x40342c, 0, 0.11, 0));
+  return g;
+};
+
+/* Ein Webstuhl mit acht Tönen */
+M.loomWheel = function(){
+  var g = M.grp();
+  g.add(M.box(0.24,1.5,0.24, 0x6b4a2a, 0, 0.75, 0));
+  g.add(M.box(1.5,0.22,0.9, 0x6b4a2a, 0, 0.11, 0));
+  var w = new THREE.Mesh(new THREE.TorusGeometry(0.72,0.06,8,22), M.mat(0x8a6a3a));
+  w.position.set(0.34,1.25,0); w.castShadow = true;
+  w.name = 'loomSpin';
+  for(var i=0;i<8;i++){
+    var sp = M.box(0.05,0.05,1.36, 0x8a6a3a, 0,0,0);
+    sp.rotation.y = Math.PI/2; sp.rotation.z = i*Math.PI/8;
+    w.add(sp);
+  }
+  g.add(w);
+  g.add(M.cyl(0.06,0.06,0.5, 0xd8c060, -0.42, 1.05, 0, 8));
+  return g;
+};
+
+/* Hut und Peitsche eines Archäologen */
+M.fedoraSet = function(){
+  var g = M.grp();
+  g.add(M.cyl(0.42,0.46,0.06, 0x6a4a28, 0, 0.03, 0, 18));
+  g.add(M.cyl(0.26,0.28,0.28, 0x7a5530, 0, 0.17, 0, 16));
+  g.add(M.cyl(0.29,0.29,0.06, 0x4a3018, 0, 0.09, 0, 16));
+  var whip = M.grp(0.7, 0.05, 0.1);
+  for(var i=0;i<7;i++){
+    var seg = M.cyl(0.035,0.03,0.30, 0x5a3a20, Math.sin(i*0.9)*0.22, 0.03, i*0.24, 6);
+    seg.rotation.x = Math.PI/2;
+    whip.add(seg);
+  }
+  g.add(whip);
+  return g;
+};
+
+/* Ein Motorradhelm */
+M.helmet = function(){
+  var g = M.grp();
+  g.add(M.ball(0.42, 0x2a2f38, 0, 0.42, 0));
+  g.add(M.box(0.70,0.22,0.14, 0x66d0ff, 0, 0.42, 0.34, {opacity:0.6, emissive:0x113344}));
+  g.add(M.box(0.24,0.10,0.86, 0xcc3322, 0, 0.72, 0));
+  g.add(M.cyl(0.40,0.44,0.08, 0x1a1e24, 0, 0.10, 0, 16));
+  return g;
+};
+
+/* Ein Plüschhase und ein Plüschhund mit Hut */
+M.plushies = function(){
+  var g = M.grp();
+  var rab = M.grp(-0.30,0,0);
+  rab.add(M.box(0.30,0.42,0.26, 0xf4f4f8, 0, 0.21, 0));
+  rab.add(M.ball(0.17, 0xf4f4f8, 0, 0.52, 0.02));
+  rab.add(M.box(0.07,0.34,0.06, 0xf4f4f8, -0.08, 0.80, 0));
+  rab.add(M.box(0.07,0.34,0.06, 0xf4f4f8,  0.08, 0.80, 0));
+  rab.add(M.ball(0.028,0x101010,-0.06,0.55,0.16));
+  rab.add(M.ball(0.028,0x101010, 0.06,0.55,0.16));
+  g.add(rab);
+  var dog = M.grp(0.30,0,0);
+  dog.add(M.box(0.34,0.46,0.28, 0xd8c8a8, 0, 0.23, 0));
+  dog.add(M.ball(0.19, 0xd8c8a8, 0, 0.56, 0.04));
+  dog.add(M.box(0.10,0.24,0.07, 0xb8a888, -0.17, 0.60, 0));
+  dog.add(M.box(0.10,0.24,0.07, 0xb8a888,  0.17, 0.60, 0));
+  dog.add(M.cyl(0.24,0.26,0.05, 0x8a7a5a, 0, 0.73, 0, 14));
+  dog.add(M.cyl(0.15,0.15,0.14, 0x8a7a5a, 0, 0.79, 0, 14));
+  dog.add(M.ball(0.045,0x101010, 0, 0.50, 0.22));
+  g.add(dog);
+  return g;
+};
+
+/* Ein zweiköpfiges Eichhörnchen unter Glas */
+M.squirrel = function(){
+  var g = M.grp();
+  g.add(M.cyl(0.42,0.42,0.09, 0x5a4a34, 0, 0.05, 0, 16));
+  var body = M.grp(0,0.08,0);
+  body.add(M.ball(0.22, 0xa8703a, 0, 0.22, 0));
+  body.add(M.ball(0.13, 0xa8703a,-0.13, 0.46, 0.04));
+  body.add(M.ball(0.13, 0xa8703a, 0.13, 0.46, 0.04));
+  body.add(M.box(0.05,0.11,0.04, 0xa8703a,-0.18,0.60,0.02));
+  body.add(M.box(0.05,0.11,0.04, 0xa8703a,-0.07,0.60,0.02));
+  body.add(M.box(0.05,0.11,0.04, 0xa8703a, 0.07,0.60,0.02));
+  body.add(M.box(0.05,0.11,0.04, 0xa8703a, 0.18,0.60,0.02));
+  body.add(M.ball(0.14, 0xc08a4a, 0, 0.28,-0.24));
+  g.add(body);
+  g.add(M.cyl(0.40,0.40,0.95, 0xaaddff, 0, 0.55, 0, 18,
+    {opacity:0.22, emissive:0x113344, noShadow:true}));
+  return g;
+};
+
+/* Ein Krug mit einem sehr aggressiven Getränk */
+M.grogMug = function(){
+  var g = M.grp();
+  g.add(M.cyl(0.19,0.16,0.40, 0x8a8a92, 0, 0.20, 0, 14));
+  var t = new THREE.Mesh(new THREE.TorusGeometry(0.10,0.03,6,12), M.mat(0x8a8a92));
+  t.position.set(0.22,0.20,0); g.add(t);
+  g.add(M.cyl(0.165,0.165,0.05, 0x6ed94a, 0, 0.38, 0, 14, {emissive:0x2a6a20}));
+  return g;
 };
 
 global.M = M;
