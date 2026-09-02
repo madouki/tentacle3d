@@ -118,6 +118,16 @@ function shellInterior(g, E, opts){
   g.add(M.box(RW, 0.22, 0.4, E.wallB, 0, 6.2,  -RD/2+0.40, {noShadow:true}));
 
   g.add(M.dust(160, RW*0.9, o.dust || 0xffffff));
+
+  // Zwei schräge Lichtbahnen von oben — gibt dem Raum Tiefe
+  var shaftCol = o.panel ? 0x8affd0 : 0xfff0c0;
+  for(var sx=-1; sx<=1; sx+=2){
+    var sh = M.lightShaft(0.7, 2.5, 11, shaftCol, o.panel ? 0.040 : 0.055);
+    sh.position.set(sx*4.6, 4.6, -2.2);
+    sh.rotation.z = sx * 0.19;
+    g.add(sh);
+  }
+  g.add(M.motes(70, RW*0.8, 6, o.panel ? 0x8affd0 : 0xffe08a, 0.10));
   return fl;
 }
 
@@ -151,6 +161,13 @@ function shellAttic(g, E){
   g.add(M.box(0.14,2.2,0.16, 0x3a2a1a, 0, 3.0, -4.35));
 
   g.add(M.dust(220, 12, 0xfff0d0));
+
+  // Der klassische Dachbodenstrahl aus dem Rundfenster
+  var beam = M.lightShaft(0.85, 2.2, 9.5, 0xfff0c0, 0.085);
+  beam.position.set(0, 2.4, -1.0);
+  beam.rotation.x = 1.02;
+  g.add(beam);
+  g.add(M.motes(110, 11, 5, 0xffe6a8, 0.12));
   return fl;
 }
 
@@ -361,19 +378,42 @@ function buildYard(era, S, g, HS, A){
       primary:'talk',
       look:function(){ return 'Ein Gründervater mit Perücke, Dreispitz und ungefähr doppelt so viel Meinung wie Haaren.'; },
       talk:function(){
-        A.say('"Guten Tag! Wir gießen soeben den Eckstein dieses Hauses."','npc');
-        A.say('"Was jetzt in den Zement kommt, überdauert die Jahrhunderte. Also bitte kein Kaugummi."','npc');
-        A.say('"Kohle zum Beispiel. Presst man Kohle lange genug, wird ein Diamant daraus."','npc');
-        A.say('"Das habe ich mir eben ausgedacht. Klingt aber gut, nicht wahr?"','npc');
-        if(!S.f.treePlanted)
-          A.say('"Und pflanzt endlich jemand einen Baum an die Hauswand! Ich will Schatten, keinen Stumpf."','npc');
-        if(!S.f.eggInsult){
-          A.setQuiet('eggInsult', true);
-          A.egg('monkey-insult');
-          A.say('"Uebrigens: Ihr kaempft wie ein dummer Bauer."','npc');
-          A.say('"Wie passend. Ihr kaempft wie eine Kuh."','hoagie');
-          A.say('"...das war unerwartet gut. Guten Tag."','npc');
-        }
+        A.dialog('Gründervater', function(){
+          var opts = [
+            {q:'Was bauen Sie hier eigentlich?', a:function(){
+              A.say('"Ein Haus für die Nachwelt! Solide, würdig, mit einem Keller für … Experimente."','npc');
+              A.say('"Fragen Sie nicht. Der Bauherr ist ein sehr eigener Mensch."','npc');
+              return true;
+            }},
+            {q:'Erzählen Sie mir was über Kohle.', a:function(){
+              A.say('"Kohle? Schwarz, staubig, brennt. Aber pressen Sie sie lange genug —"','npc');
+              A.say('"— und Sie halten einen Diamanten in der Hand. Vierhundert Jahre sollten reichen."','npc');
+              A.say('"Das habe ich mir eben ausgedacht. Klingt aber gut, nicht wahr?"','npc');
+              return true;
+            }},
+            {q:'Was passiert mit dem nassen Zement?', a:function(){
+              A.say('"Der härtet aus und trägt dann dieses Haus. Für immer."','npc');
+              A.say('"Was jetzt hineinkommt, bleibt drin. Also bitte kein Kaugummi."','npc');
+              A.say('"Der letzte Lehrling hat seinen Hut verloren. Der ist jetzt Teil der Geschichte."','npc');
+              return true;
+            }}
+          ];
+          if(!S.f.treePlanted) opts.push({q:'Warum steht hier kein Baum?', a:function(){
+            A.say('"Weil niemand einen pflanzt! Ich will Schatten, keinen Stumpf."','npc');
+            A.say('"Da drüben ist frisch umgegraben. Ein Kind könnte das."','npc');
+            return true;
+          }});
+          if(!S.f.eggInsult) opts.push({q:'Sie sehen aus, als könnten Sie fechten.', a:function(){
+            A.setQuiet('eggInsult', true);
+            A.egg('monkey-insult');
+            A.say('"Ha! Ihr kämpft wie ein dummer Bauer."','npc');
+            A.say('"Wie passend. Ihr kämpft wie eine Kuh."','hoagie');
+            A.say('"...das war unerwartet gut. Guten Tag."','npc');
+            return true;
+          }});
+          opts.push({q:'Schönen Tag noch.', a:null});
+          return opts;
+        });
         return null;
       },
       take:function(){ return 'Gründerväter nimmt man nicht mit. Steht so in der Verfassung. Vermutlich.'; }
@@ -499,14 +539,38 @@ function buildYard(era, S, g, HS, A){
             : 'Ein grünes Tentakel in Wachuniform. Keine Arme, dafür ein bemerkenswertes Pflichtgefühl — und es lässt den Eckstein nicht aus den Augen.';
         },
         talk:function(){
-          if(S.f.disguised){
-            A.say('"Alles ruhig, Kollege. Diese Menschen heute, ich sag dir..."','npc');
-            A.say('"Guck ruhig beim Eckstein nach dem Rechten. Ich mach Pause."','npc');
-            return null;
-          }
-          A.say('"Halt. Menschen sind ab 14 Uhr verboten."','npc');
-          A.say('"Ich bewache diesen Eckstein. Frag nicht warum, ich bewache einfach."','npc');
-          A.say('"Wären Sie ein Tentakel, wäre das natürlich etwas völlig anderes."','npc');
+          A.dialog('Wach-Tentakel', function(){
+            if(S.f.disguised) return [
+              {q:'Alles ruhig hier, Kollege?', a:function(){
+                A.say('"Absolut. Diese Menschen heute, ich sag dir..."','npc');
+                A.say('"Guck ruhig beim Eckstein nach dem Rechten. Ich mach Pause."','npc');
+                return true;
+              }},
+              {q:'Schöne Uniform.', a:function(){
+                A.say('"Danke! Maßgeschneidert. Zwei Ärmel weniger als bei den anderen."','npc');
+                return true;
+              }},
+              {q:'Bis später.', a:null}
+            ];
+            return [
+              {q:'Warum darf ich hier nicht durch?', a:function(){
+                A.say('"Menschen sind ab 14 Uhr verboten. Steht in der Vorschrift."','npc');
+                A.say('"Vor 14 Uhr übrigens auch. Die Vorschrift ist knapp gehalten."','npc');
+                return true;
+              }},
+              {q:'Was bewachen Sie eigentlich?', a:function(){
+                A.say('"Diesen Eckstein. Frag nicht warum, ich bewache einfach."','npc');
+                A.say('"Seit vierhundert Jahren ist da nichts passiert. Vorbildliche Bilanz."','npc');
+                return true;
+              }},
+              {q:'Wen würden Sie denn durchlassen?', a:function(){
+                A.say('"Tentakel natürlich. Kollegen erkennt man sofort."','npc');
+                A.say('"Woran? Am Schlauch. Und an der aufrechten Haltung."','npc');
+                return true;
+              }},
+              {q:'Dann eben nicht.', a:null}
+            ];
+          });
           return null;
         },
         use:function(item){
@@ -534,6 +598,9 @@ function buildYard(era, S, g, HS, A){
   var deco = era === 'future' ? 0x5f4a7a : (era === 'past' ? 0x3f7a30 : 0x35702c);
   var t1 = M.tree(deco); t1.position.set(-11.5, 0, 3.2); g.add(t1);
   var t2 = M.tree(deco); t2.position.set(12.6, 0, 4.6); g.add(t2);
+  g.add(M.motes(era === 'future' ? 130 : 70, 26, 7,
+                era === 'future' ? 0x8affd0 : 0xffe08a,
+                era === 'future' ? 0.13 : 0.11));
   g.add(M.clouds(8, era === 'future' ? 0x6a4a8c : 0xf4f6fa, 10.5, 66));
   g.add(M.birds(era === 'future' ? 2 : 4, era === 'future' ? 0x2a1a3a : 0x2e2e34));
 
@@ -966,11 +1033,36 @@ function buildLab(era, S, g, HS, A){
       },
       talk:function(){
         if(S.f.valveClosed){ A.say('Der Thron antwortet nicht. Ausgesprochen beruhigend.'); return null; }
-        A.say('"Ha! Ein Mensch! Wie niedlich."','tent');
-        A.say('"Ich habe diesen Planeten in nur zweihundert Jahren erobert. Mit ARMEN!"','tent');
-        A.say('"Und das nur, weil ich damals diesen herrlichen grünen Schlamm aus dem Fluss getrunken habe."','tent');
-        A.say('"Das kann mir niemand mehr nehmen. Niemand!"','tent');
-        A.say('"...warum lächelst du so?"','tent');
+        A.dialog('Lila Tentakel', function(){
+          return [
+            {q:'Wie hast du die Welt erobert?', a:function(){
+              A.say('"Ha! Ein Mensch! Wie niedlich, dass du fragst."','tent');
+              A.say('"Zweihundert Jahre. Mit ARMEN. Und mit sehr vielen Formularen."','tent');
+              A.say('"Und das alles nur, weil ich damals diesen herrlichen grünen Schlamm getrunken habe."','tent');
+              return true;
+            }},
+            {q:'Woher kam dieser Schlamm?', a:function(){
+              A.say('"Aus dem Fluss! Dr. Fred hat ihn hineingeleitet, der gute Mann."','tent');
+              A.say('"Wenn es den Schlamm nicht gegeben hätte, wäre ich heute ein gewöhnliches Tentakel."','tent');
+              A.say('"Aber das kann mir ja niemand mehr nehmen. Niemand!"','tent');
+              A.say('"...warum lächelst du so?"','tent');
+              return true;
+            }},
+            {q:'Nette Krone.', a:function(){
+              A.say('"Nicht wahr? Handgefertigt. Von mir. Mit meinen ARMEN."','tent');
+              A.say('"Ich erwähne die Arme gern. Ich hatte lange keine."','tent');
+              return true;
+            }},
+            {q:'Und wenn jemand den Schlamm abstellt?', a:function(){
+              A.say('"Abstellen? Das Ventil ist seit zweihundert Jahren verrostet."','tent');
+              A.say('"Dafür bräuchte man Werkzeug. Sehr altes, sehr gutes Werkzeug."','tent');
+              A.say('"Zum Glück gibt es so etwas nicht mehr. Hahaha!"','tent');
+              A.say('"...hahaha?"','tent');
+              return true;
+            }},
+            {q:'Ich lass dich mal weiterplanen.', a:null}
+          ];
+        });
         return null;
       },
       take:function(){ return 'Laverne fasst kein Tentakel an. Prinzipiell.'; },
@@ -1247,6 +1339,11 @@ function shellCellar(g, E, era){
   }
 
   g.add(M.dust(200, 15, 0xcfc0a0));
+
+  var cone = M.lightShaft(0.4, 4.6, 5.4, era === 'future' ? 0x49e6a0 : 0xffcc88, 0.075);
+  cone.position.set(0, 2.9, 0);
+  g.add(cone);
+  g.add(M.motes(80, 13, 4, era === 'future' ? 0x49e6a0 : 0xffcc88, 0.11));
   return fl;
 }
 

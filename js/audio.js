@@ -51,9 +51,37 @@ var TRACKS = {
     ]
   },
 
+  /* ---------- Abspann: das Titelthema, aber in Dur und zufrieden ---------- */
+  win: {
+    bpm:92, order:[0,1],
+    sections:[
+      { drums:S("K . . . . . H . S . . . . . H . K . . . . . H . S . . H . . H ."),
+        voices:[
+        {type:'triangle', gain:0.14, dur:0.7, cut:3200, seq:S(
+          "C5 . . .  E5 . . .  G5 . . .  E5 . . . " +
+          "F5 . . .  E5 . . .  D5 . . .  C5 . . . ")},
+        {type:'sine', gain:0.10, dur:1.5, cut:800, seq:S(
+          "C2 . . .  . . . .   G2 . . .  . . . . " +
+          "F2 . . .  . . . .   C2 . . .  G2 . . . ")},
+        {type:'sine', gain:0.05, dur:1.2, cut:2000, seq:S(
+          "E4 . . .  G4 . . .  C5 . . .  G4 . . . " +
+          "A4 . . .  G4 . . .  F4 . . .  E4 . . . ")}
+      ]},
+      { drums:S("K . H . . . S . K . H . . . S . K . H . . . S . K . H . S . S ."),
+        voices:[
+        {type:'triangle', gain:0.13, dur:0.34, cut:3400, seq:S(
+          "G5 . F5 . E5 . D5 .  C5 . D5 . E5 . G5 . " +
+          "A5 . G5 . E5 . D5 .  C5 . . .  . . . . ")},
+        {type:'sine', gain:0.10, dur:1.5, cut:800, seq:S(
+          "A1 . . .  . . . .   F2 . . .  . . . . " +
+          "G2 . . .  . . . .   C2 . . .  . . . . ")}
+      ]}
+    ]
+  },
+
   /* ---------- 1776: Cembalo-Menuett mit Basso continuo ---------- */
   past: {
-    bpm:126, order:[0,0,1,2],
+    bpm:126, order:[0,0,1,2,0,3],
     sections:[
       { voices:[
         {type:'triangle', gain:0.15, dur:0.20, cut:3000, seq:S(
@@ -84,13 +112,24 @@ var TRACKS = {
         {type:'triangle', gain:0.05, dur:0.5, cut:1000, seq:S(
           "G2 . . .  . . . .   D3 . . .  . . . . " +
           "A2 . . .  . . . .   D2 . . .  . . . . ")}
+      ]},
+      { voices:[                                   /* Kanon: zwei Stimmen versetzt */
+        {type:'triangle', gain:0.13, dur:0.18, cut:3200, seq:S(
+          "D5 . C#5 . B4 . A4 .  G4 . F#4 . E4 . D4 . " +
+          "A4 . B4 . C#5 . D5 .  E5 . D5 . C#5 . A4 . ")},
+        {type:'square', gain:0.038, dur:0.18, cut:2200, seq:S(
+          ". . . .   D4 . C#4 . B3 . A3 .  G3 . F#3 . " +
+          "E3 . D3 . A3 . B3 .   C#4 . D4 . E4 . D4 . ")},
+        {type:'triangle', gain:0.05, dur:0.46, cut:1000, seq:S(
+          "D2 . . .  A2 . . .  D2 . . .  G2 . . . " +
+          "A2 . . .  D3 . . .  A2 . . .  D2 . . . ")}
       ]}
     ]
   },
 
   /* ---------- Gegenwart: Lounge-Groove, Em–C–G–D ---------- */
   present: {
-    bpm:94, order:[0,0,1,0],
+    bpm:94, order:[0,0,1,0,2,1],
     sections:[
       { drums:S("K . . . . . H . S . . . . . H . K . . K . . H . S . . . . H . H"),
         voices:[
@@ -115,6 +154,18 @@ var TRACKS = {
         {type:'sine', gain:0.05, dur:0.9, cut:1800, seq:S(
           "E5 . . .  . . D5 . . . . .  B4 . . . " +
           ". . . .   A4 . . . . . . .  . . . . ")}
+      ]},
+      { drums:S("K . . . H . S . . H K . . . S . K . . H . . S . . . K . S . H ."),
+        voices:[                                   /* Zwischenspiel, luftiger */
+        {type:'sine', gain:0.10, dur:0.9, cut:2200, seq:S(
+          "G4 . . .  . . . .  A4 . . .  B4 . . . " +
+          "C5 . . .  . . B4 .  A4 . . .  G4 . . . ")},
+        {type:'triangle', gain:0.085, dur:0.34, cut:820, seq:S(
+          "C2 . . .  G2 . . .  C2 . . .  G2 . . . " +
+          "A2 . . .  E2 . . .  D2 . . .  G2 . . . ")},
+        {type:'sine', gain:0.04, dur:1.6, cut:1600, seq:S(
+          "E5 . . .  . . . .  . . . .  . . . . " +
+          ". . . .   . . . .  D5 . . .  . . . . ")}
       ]}
     ]
   },
@@ -189,11 +240,17 @@ var Snd = {
       conv.buffer = buf;
     }catch(e){ conv = null; }
 
+    this.spaceFilter = c.createBiquadFilter();     // Raumcharakter je Schauplatz
+    this.spaceFilter.type = 'lowpass';
+    this.spaceFilter.frequency.value = 18000;
+    this.spaceFilter.Q.value = 0.4;
+
     this.musicGain = c.createGain(); this.musicGain.gain.value = 1.0;   // fürs Ducking
     this.musicBus  = c.createGain(); this.musicBus.gain.value  = 0.52;
     this.sfxBus    = c.createGain(); this.sfxBus.gain.value    = 0.85;
 
-    this.musicBus.connect(this.musicGain);
+    this.musicBus.connect(this.spaceFilter);
+    this.spaceFilter.connect(this.musicGain);
     if(conv){
       var wet = c.createGain(); wet.gain.value = 0.24;
       conv.connect(wet); wet.connect(this.master);
@@ -208,6 +265,20 @@ var Snd = {
   },
 
   resume:function(){ if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+
+  /* Wie klingt der Raum? Keller dumpf, Hof offen, Dachboden gedämpft. */
+  setSpace:function(room){
+    if(!this.ready || !this.spaceFilter) return;
+    var cut = 18000;
+    if(room === 'cellar')      cut = 850;
+    else if(room === 'attic')  cut = 3600;
+    else if(room === 'yard')   cut = 16000;
+    else                       cut = 9000;
+    var f = this.spaceFilter.frequency, t = this.ctx.currentTime;
+    f.cancelScheduledValues(t);
+    f.setValueAtTime(f.value, t);
+    f.linearRampToValueAtTime(cut, t + 0.6);
+  },
 
   /* Musik zurücknehmen, solange gesprochen wird */
   duck:function(on){

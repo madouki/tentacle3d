@@ -34,7 +34,41 @@
   <button class="tool" id="btnHelp"  title="Hilfe">&#9776;</button>
 </div>
 
-<div id="inv" class="empty"></div>
+<div id="dock">
+  <div id="inv" class="empty"></div>
+  <button id="btnChrono" title="Chron-o-John öffnen (C)">
+    <span class="cj-ic">&#128701;</span><span class="cj-lb">Chron-o-John</span>
+  </button>
+</div>
+
+<!-- ------------------------- Chron-o-John-Panel ------------------------ -->
+<div class="screen hidden" id="chronoScreen">
+  <div class="panel" style="max-width:520px">
+    <h1 style="font-size:22px">CHRON-O-JOHN</h1>
+    <h2>Kleine Gegenstände durch die Jahrhunderte spülen</h2>
+
+    <div class="chrono-label">Gegenstand</div>
+    <div id="chronoItems" class="chrono-row"></div>
+
+    <div class="chrono-label">Empfänger</div>
+    <div id="chronoTargets" class="chrono-row"></div>
+
+    <div id="chronoNote" class="chrono-note"></div>
+
+    <div class="btnrow">
+      <button class="big dim" id="chronoSend" disabled>Durchspülen</button>
+      <button class="big alt" id="chronoCancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------------------- Dialogauswahl -------------------------- -->
+<div id="dialogueScreen" class="hidden">
+  <div class="dlg-box">
+    <div class="dlg-title" id="dialogueTitle"></div>
+    <div id="dialogueOpts"></div>
+  </div>
+</div>
 
 <!-- ------------------------------- Titel ------------------------------- -->
 <div class="screen" id="titleScreen">
@@ -58,13 +92,16 @@
       <div><kbd>H</kbd> Tipp — zweimal für Klartext</div>
       <div><kbd>M</kbd> Musik &nbsp; <kbd>V</kbd> Stimmen &nbsp; <kbd>U</kbd> Untertitel</div>
       <div><kbd>L</kbd> Protokoll &nbsp; <kbd>F</kbd> Vollbild</div>
+      <div><kbd>C</kbd> Chron-o-John öffnen</div>
       <div><kbd>Leer</kbd> Text überspringen</div>
       <div><kbd>Esc</kbd> Auswahl abbrechen</div>
     </div>
 
     <ul>
       <li>Gegenstand unten im Inventar anklicken, dann das Ziel im Bild anklicken.</li>
-      <li>Der <b>Chron-o-John</b> spült Gegenstände durch die Jahrhunderte zu den anderen.</li>
+      <li>Der <b>Chron-o-John</b> spült Gegenstände durch die Jahrhunderte zu den anderen —
+          der Knopf unten rechts öffnet ihn von überall aus.</li>
+      <li>Manche Figuren lassen sich <b>ausfragen</b>: Antworten wählen mit Klick oder Zifferntaste.</li>
       <li>Rechtsklick auf ein Inventarstück beschreibt es.</li>
       <li>In den Räumen stecken <b>zwölf Anspielungen</b> auf andere Spiele und Filme.
           Am Ende wird gezählt, wie viele du gefunden hast.</li>

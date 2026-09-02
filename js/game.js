@@ -151,9 +151,9 @@ function buildRoom(){
   roomGroup.add(actorShadow);
 
   walk.active = false; walk.then = null;
-  hovered = null; setStatus('');
+  hovered = null; hoveredRec = null; setStatus('');
   drawInv();
-  if(Snd.ready) Snd.play(e);
+  if(Snd.ready){ Snd.play(e); Snd.setSpace(r); }
 }
 
 function rebuild(){
@@ -235,7 +235,7 @@ function switchTo(id){
 }
 
 /* ---------------------- Untertitel + Sprachausgabe ------------------- */
-var sayQ = [], sayTimer = null, sayActive = false;
+var sayQ = [], sayTimer = null, sayActive = false, sayDoneCb = null;
 var subsOn = true, logLines = [];
 var SPEAKER = {sys:'#cbb8e8', npc:'#ffe0a0', tent:'#e0a0ff'};
 
@@ -253,7 +253,12 @@ function pushLog(who, text){
 
 function nextSay(){
   if(sayTimer){ clearTimeout(sayTimer); sayTimer = null; }
-  if(!sayQ.length){ elSub.innerHTML = ''; sayActive = false; return; }
+  if(!sayQ.length){
+    elSub.innerHTML = ''; sayActive = false;
+    var done = sayDoneCb; sayDoneCb = null;
+    if(done) setTimeout(done, 120);
+    return;
+  }
   sayActive = true;
   var s = sayQ.shift();
   var color = SPEAKER[s.w] || (CH[s.w] ? CH[s.w].ui : '#ffffff');
@@ -277,7 +282,7 @@ function nextSay(){
 }
 
 function clearSay(){
-  sayQ = [];
+  sayQ = []; sayDoneCb = null;
   if(sayTimer){ clearTimeout(sayTimer); sayTimer = null; }
   sayActive = false;
   elSub.innerHTML = '';
@@ -330,6 +335,46 @@ function doFlush(item, target){
   camShake = 0.5;
 }
 
+/* --------------------------- Dialoge --------------------------------- */
+var dlgScreen = document.getElementById('dialogueScreen');
+var dlgTitle  = document.getElementById('dialogueTitle');
+var dlgOpts   = document.getElementById('dialogueOpts');
+var dlgBuild  = null;
+
+function showDialogue(title, buildFn){
+  dlgBuild = buildFn;
+  dlgTitle.textContent = title;
+  renderDialogue();
+}
+
+function renderDialogue(){
+  if(!dlgBuild) return;
+  var opts = dlgBuild();
+  if(!opts || !opts.length){ closeDialogue(); return; }
+  dlgOpts.innerHTML = '';
+  opts.forEach(function(o, i){
+    var b = document.createElement('button');
+    b.className = 'dlg-opt';
+    b.innerHTML = '<span class="num">' + (i+1) + '</span>' + o.q;
+    b.onclick = function(){ chooseDialogue(o); };
+    dlgOpts.appendChild(b);
+  });
+  dlgScreen.classList.remove('hidden');
+}
+
+function chooseDialogue(o){
+  dlgScreen.classList.add('hidden');
+  if(!o.a){ closeDialogue(); return; }
+  var again = o.a();
+  if(again) sayDoneCb = renderDialogue;
+  else closeDialogue();
+}
+
+function closeDialogue(){
+  dlgScreen.classList.add('hidden');
+  dlgBuild = null;
+}
+
 /* ======================================================================
    5. Anspielungen
    ====================================================================== */
@@ -372,8 +417,85 @@ var API = {
   rebuild: rebuild,
   rebuildSoon: function(){ setTimeout(rebuild, 0); },
   flush: askFlush,
+  dialog: showDialogue,
   wear: function(){ return wearCostume(); },
   win: winGame
+};
+
+/* ------------------- Chron-o-John: Schnellzugriff -------------------- */
+var chronoScreen = document.getElementById('chronoScreen');
+var chronoItems  = document.getElementById('chronoItems');
+var chronoTargets= document.getElementById('chronoTargets');
+var chronoSend   = document.getElementById('chronoSend');
+var chronoNote   = document.getElementById('chronoNote');
+var cItem = null, cTarget = null;
+
+/* Ruft der Spieler den Chron-o-John von außerhalb des Labors, geht die
+   Figur zuerst dorthin — der Knopf spart den Weg, nicht die Logik. */
+function openChrono(){
+  if(!S) return;
+  if(me().room !== 'lab'){
+    say('[' + CH[S.who].name + ' geht zum Chron-o-John.]', 'sys');
+    changeRoom('lab');
+    setTimeout(showChrono, 420);
+    return;
+  }
+  showChrono();
+}
+
+function showChrono(){
+  cItem = S.sel && me().inv.indexOf(S.sel) >= 0 ? S.sel : null;
+  cTarget = null;
+  renderChrono();
+  chronoScreen.classList.remove('hidden');
+}
+
+function renderChrono(){
+  var inv = me().inv;
+  chronoItems.innerHTML = '';
+  if(!inv.length){
+    chronoItems.innerHTML = '<p class="chrono-empty">' + CH[S.who].name +
+      ' hat nichts dabei, das sich durchspülen ließe.</p>';
+  } else {
+    inv.forEach(function(id){
+      var it = ITEMS[id];
+      var b = document.createElement('button');
+      b.className = 'slot' + (cItem === id ? ' on' : '');
+      b.textContent = it.ic;
+      b.setAttribute('data-name', it.name);
+      b.title = it.name;
+      b.onclick = function(){ cItem = (cItem === id) ? null : id; renderChrono(); };
+      chronoItems.appendChild(b);
+    });
+  }
+
+  chronoTargets.innerHTML = '';
+  W.CHAR_IDS.filter(function(id){ return id !== S.who; }).forEach(function(id){
+    var c = CH[id];
+    var b = document.createElement('button');
+    b.className = 'chrono-target' + (cTarget === id ? ' on' : '');
+    b.innerHTML = '<span class="dot" style="background:' + c.ui + '"></span>' +
+                  '<span>' + c.name + '<small>' + c.sub + '</small></span>';
+    b.onclick = function(){ cTarget = (cTarget === id) ? null : id; renderChrono(); };
+    chronoTargets.appendChild(b);
+  });
+
+  var ready = !!(cItem && cTarget);
+  chronoSend.disabled = !ready;
+  chronoSend.classList.toggle('dim', !ready);
+  chronoNote.textContent = ready
+    ? ITEMS[cItem].name + '  →  ' + CH[cTarget].name
+    : (cItem ? 'Und an wen?' : 'Was soll durch die Zeit?');
+}
+
+function closeChrono(){ chronoScreen.classList.add('hidden'); }
+
+document.getElementById('btnChrono').onclick = openChrono;
+document.getElementById('chronoCancel').onclick = closeChrono;
+chronoSend.onclick = function(){
+  if(!cItem || !cTarget) return;
+  closeChrono();
+  doFlush(cItem, cTarget);
 };
 
 /* ======================================================================
@@ -446,7 +568,27 @@ function changeRoom(target){
 }
 
 /* --------------------------- Maus ------------------------------------ */
-var hovered = null;
+var hovered = null, hoveredRec = null;
+
+/* Angeklicktes Objekt leuchtet leicht auf — ohne Materialien zu tauschen */
+function setHighlight(rec, on){
+  if(!rec || !rec.obj) return;
+  rec.obj.traverse(function(o){
+    if(!o.isMesh || o.userData.outline) return;
+    var m = o.material;
+    if(!m || !m.emissive) return;
+    if(on){
+      if(!o.userData._glow) o.userData._glow = m.emissive.clone();
+      var b = o.userData._glow;
+      m.emissive.setRGB(
+        Math.min(1, b.r + 0.20),
+        Math.min(1, b.g + 0.17),
+        Math.min(1, b.b + 0.09));
+    } else if(o.userData._glow){
+      m.emissive.copy(o.userData._glow);
+    }
+  });
+}
 function pick(ev){
   var r = canvas.getBoundingClientRect();
   if(!r.width || !r.height) return {hs:null, floor:null};
@@ -469,6 +611,11 @@ canvas.addEventListener('mousemove', function(ev){
   if(!S) return;
   var p = pick(ev);
   var n = p.hs ? p.hs.name : '';
+  if(p.hs !== hoveredRec){
+    setHighlight(hoveredRec, false);
+    setHighlight(p.hs, true);
+    hoveredRec = p.hs;
+  }
   if(n !== hovered){ hovered = n; setStatus(n); }
   canvas.style.cursor = p.hs ? 'pointer' : 'default';
 });
@@ -503,7 +650,7 @@ document.addEventListener('keydown', function(ev){
   var k = (ev.key || '').toLowerCase();
   if(k === 'f'){ ev.preventDefault(); toggleFullscreen(); return; }
   if(!S) return;
-  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); }
+  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); closeChrono(); }
   else if(k === 'h'){ showHint(); }
   else if(k === '1'){ switchTo('bernard'); }
   else if(k === '2'){ switchTo('hoagie'); }
@@ -512,6 +659,11 @@ document.addEventListener('keydown', function(ev){
   else if(k === 'v'){ toggleVoice(); }
   else if(k === 'u'){ toggleSubs(); }
   else if(k === 'l'){ toggleLog(); }
+  else if(k === 'c'){ openChrono(); }
+  else if(dlgScreen && !dlgScreen.classList.contains('hidden') && /^[1-9]$/.test(k)){
+    var btn = dlgOpts.children[parseInt(k,10) - 1];
+    if(btn) btn.click();
+  }
   else if(k === ' '){ ev.preventDefault(); skipSay(); }
 });
 
@@ -692,9 +844,14 @@ function wearCostume(){
    ====================================================================== */
 function winGame(){
   Snd.sfx('win');
+  Snd.play('win');
+  Snd.setSpace('yard');
   var eggs = eggFound(), total = eggTotal();
   var eggLine = eggs >= total
-    ? '<b>Alle ' + total + ' Anspielungen gefunden.</b> Respekt — du hast in jede Ecke geschaut.'
+    ? '<b>Alle ' + total + ' Anspielungen gefunden.</b> Respekt — du hast in jede Ecke geschaut.<br><br>' +
+      '<i>Nachtrag:</i> Auf dem Dachboden findet Bernard Wochen später eine Kiste, die vorher nicht ' +
+      'da war. Darin: ein Gummihuhn, ein Filzhut, ein zweiköpfiges Eichhörnchen und ein Zettel in ' +
+      'seiner eigenen Handschrift — <i>"Falls du das liest: Es hat sich gelohnt."</i>'
     : 'Gefundene Anspielungen: <b>' + eggs + ' von ' + total + '</b>. Da liegt noch was herum.';
 
   document.getElementById('endTitle').textContent = 'GESCHAFFT!';
@@ -918,6 +1075,17 @@ function animate(){
     }
   }
   if((o = roomGroup.getObjectByName('dust'))) o.rotation.y = t*0.03;
+  if((o = roomGroup.getObjectByName('motes')) && o.geometry){
+    var pos = o.geometry.attributes.position, base = o.userData.base, seed = o.userData.seed;
+    if(base && seed){
+      for(var pi=0; pi<seed.length; pi++){
+        pos.array[pi*3+1] = base[pi*3+1] + Math.sin(t*0.55 + seed[pi]) * 0.55;
+        pos.array[pi*3]   = base[pi*3]   + Math.cos(t*0.32 + seed[pi]) * 0.35;
+      }
+      pos.needsUpdate = true;
+    }
+    o.material.opacity = 0.55 + Math.sin(t*1.3)*0.18;
+  }
 
   /* Wolken ziehen, Vögel kreisen */
   if((o = roomGroup.getObjectByName('clouds'))){

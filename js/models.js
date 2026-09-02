@@ -602,5 +602,70 @@ M.grogMug = function(){
   return g;
 };
 
+
+/* ======================================================================
+   8. Licht und Schwebeteilchen
+   ====================================================================== */
+
+/* Sichtbarer Lichtkegel — für Fenster, Lampen, Luken.
+   Additiv gemischt, ohne Tiefenschreiben, damit nichts hart schneidet. */
+M.lightShaft = function(rTop, rBottom, height, color, opacity){
+  var geo = new THREE.CylinderGeometry(rTop, rBottom, height, 18, 1, true);
+  var m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: color === undefined ? 0xfff0c0 : color,
+    transparent:true,
+    opacity: opacity === undefined ? 0.10 : opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite:false,
+    side: THREE.DoubleSide
+  }));
+  m.userData.noOutline = true;
+  m.renderOrder = 3;
+  m.name = 'shaft';
+  return m;
+};
+
+/* Glühwürmchen, Ascheflocken, Schwebestaub — je nach Farbe und Tempo */
+M.motes = function(count, spread, height, color, size){
+  var geo = new THREE.BufferGeometry();
+  var pos = new Float32Array(count*3);
+  var seed = new Float32Array(count);
+  for(var i=0;i<count;i++){
+    pos[i*3]   = (Math.random()-0.5)*spread;
+    pos[i*3+1] = Math.random()*height + 0.3;
+    pos[i*3+2] = (Math.random()-0.5)*spread*0.6;
+    seed[i] = Math.random()*Math.PI*2;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  var p = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: color || 0xffe08a,
+    size: size || 0.16,
+    transparent:true, opacity:0.75,
+    depthWrite:false, sizeAttenuation:true,
+    blending: THREE.AdditiveBlending
+  }));
+  p.name = 'motes';
+  p.userData.seed = seed;
+  p.userData.base = pos.slice(0);
+  return p;
+};
+
+/* Ein Regal voller Kleinkram — füllt leere Wände */
+M.clutterShelf = function(w, colorA, colorB){
+  var g = M.grp();
+  g.add(M.box(w, 0.16, 0.9, colorA, 0, 0, 0));
+  g.add(M.box(0.16, 1.2, 0.9, colorA, -w/2+0.08, -0.6, 0));
+  g.add(M.box(0.16, 1.2, 0.9, colorA,  w/2-0.08, -0.6, 0));
+  var n = Math.max(3, Math.floor(w/0.7));
+  for(var i=0;i<n;i++){
+    var x = -w/2 + 0.5 + i*(w-1)/(n-1||1);
+    var kind = i % 3;
+    if(kind === 0)      g.add(M.cyl(0.12,0.14,0.38, colorB, x, 0.27, 0, 10));
+    else if(kind === 1) g.add(M.box(0.24,0.32,0.24, colorB, x, 0.24, 0));
+    else                g.add(M.ball(0.15, colorB, x, 0.23, 0));
+  }
+  return g;
+};
+
 global.M = M;
 })(window);

@@ -33,11 +33,18 @@ Diamanten.
 | <kbd>H</kbd> | Tipp — einmal andeutend, zweimal im Klartext |
 | <kbd>M</kbd> <kbd>V</kbd> <kbd>U</kbd> | Musik / Stimmen / Untertitel |
 | <kbd>L</kbd> | Gesprächsprotokoll |
+| <kbd>C</kbd> | Chron-o-John von überall öffnen |
 | <kbd>F</kbd> | Vollbild |
 | <kbd>Leertaste</kbd> / <kbd>Esc</kbd> | Text überspringen / Auswahl abbrechen |
 
 Das Spiel startet direkt im Vollbild. Der **Chron-o-John** im Labor spült Gegenstände durch
-die Jahrhunderte zu den anderen beiden — das ist der Kern jedes Rätsels.
+die Jahrhunderte zu den anderen beiden — das ist der Kern jedes Rätsels. Der Knopf unten
+rechts (oder <kbd>C</kbd>) öffnet ihn von jedem Raum aus; steht die Figur woanders, geht sie
+zuerst ins Labor. Im Panel wählt man Gegenstand und Empfänger und spült in einem Zug.
+
+Mit einigen Figuren lässt sich **richtig reden**: Der Gründervater, das Wach-Tentakel und das
+lila Tentakel haben Antwortbäume, die sich je nach Spielstand ändern. Antworten wählt man per
+Klick oder Zifferntaste.
 
 ## Was drinsteckt
 
@@ -46,16 +53,21 @@ die Jahrhunderte zu den anderen beiden — das ist der Kern jedes Rätsels.
 - **Fünf verzahnte Rätselketten** über alle drei Figuren hinweg, eine davon optional
 - **Zwölf versteckte Anspielungen** auf andere Spiele und Filme. Wer eine findet, bekommt
   eine Meldung; am Ende wird gezählt.
-- **Prozedurale Musik**: ein eigenes Stück je Epoche, aufgebaut aus A-, B- und C-Sektionen,
-  die in wechselnder Reihenfolge laufen — Cembalo-Menuett für 1776, Lounge-Groove mit
-  Schlagzeug für die Gegenwart, Sägezahn-Synth in c-Moll für 2200. Dazu ein eigenes
-  Titelthema, weiche Übergänge beim Epochenwechsel und automatisches Absenken, sobald
-  jemand spricht.
+- **Prozedurale Musik**: ein eigenes Stück je Epoche aus bis zu vier Sektionen, die in
+  wechselnder Reihenfolge laufen — Cembalo-Menuett mit Kanon-Teil für 1776, Lounge-Groove
+  mit Schlagzeug und Zwischenspiel für die Gegenwart, Sägezahn-Synth in c-Moll für 2200.
+  Dazu ein eigenes Titelthema, ein Abspannstück in Dur, weiche Übergänge beim
+  Epochenwechsel und automatisches Absenken, sobald jemand spricht.
+- **Raumklang**: Ein Filter passt die Musik dem Schauplatz an — im Keller dumpf, auf dem
+  Dachboden gedämpft, im Hof offen.
 - **Sprachausgabe** über die Web Speech API — jede Figur mit eigener Stimme, Tonhöhe und
   Sprechtempo. Untertitel laufen synchron mit und lassen sich einzeln abschalten.
 - **Prozedurale Texturen** (Ziegel, Dielen, Gras, Beton, Zukunftspaneele) aus
-  Canvas-Zeichnungen, Cartoon-Konturen, Kontaktschatten, weiche Schatten, Staubpartikel,
-  ziehende Wolken, kreisende Vögel, blinzelnde Figuren, Blenden beim Raumwechsel
+  Canvas-Zeichnungen, Cartoon-Konturen, Kontaktschatten, weiche Schatten, sichtbare
+  Lichtbahnen mit tanzendem Staub, Glühwürmchen und Ascheflocken, ziehende Wolken,
+  kreisende Vögel, blinzelnde Figuren, Blenden beim Raumwechsel
+- **Hervorhebung beim Überfahren**: Anklickbares leuchtet leicht auf, statt nur oben
+  benannt zu werden
 
 ## Lokal starten
 
