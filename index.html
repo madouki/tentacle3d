@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Der Tag der Tentakel — 3D</title>
+<meta name="description" content="Ein Point-and-Click-Adventure in drei Zeitaltern, gebaut mit three.js.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#129761;</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="boot">wird geladen …</div>
+
+<div id="view">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="status"></div>
+<div id="subtitle"></div>
+
+<div id="cast"></div>
+
+<div id="tools">
+  <button class="tool" id="btnMusic" title="Musik an/aus (M)">&#9834;</button>
+  <button class="tool" id="btnVoice" title="Sprachausgabe an/aus (V)">&#128483;</button>
+  <button class="tool" id="btnHint"  title="Tipp (H)">?</button>
+  <button class="tool" id="btnHelp"  title="Hilfe">&#9776;</button>
+</div>
+
+<div id="inv" class="empty"></div>
+
+<!-- ------------------------------- Titel ------------------------------- -->
+<div class="screen" id="titleScreen">
+  <div class="panel">
+    <h1>DER TAG DER TENTAKEL</h1>
+    <h2>Ein Point-&amp;-Click-Abenteuer in drei Zeitaltern — gebaut mit three.js</h2>
+
+    <p>Das lila Tentakel hat Dr. Freds Giftschlamm getrunken, Arme bekommen und die
+       Weltherrschaft angekündigt. Dr. Fred schickt <b>Bernard</b>, <b>Hoagie</b> und
+       <b>Laverne</b> in drei Chron-o-Johns zurück in der Zeit — doch die Maschine lief
+       mit einem falschen Diamanten und ist explodiert.</p>
+
+    <p>Hoagie landet <b>200 Jahre in der Vergangenheit</b>, Laverne <b>200 Jahre in der
+       Zukunft</b>, Bernard hängt in der <b>Gegenwart</b> fest. Was einer von ihnen in
+       seiner Epoche anstellt, finden die anderen in ihrer wieder.</p>
+
+    <div class="keys">
+      <div><kbd>Links</kbd> Objekt anklicken = handeln, Boden = laufen</div>
+      <div><kbd>Rechts</kbd> Objekt ansehen</div>
+      <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Figur wechseln</div>
+      <div><kbd>H</kbd> Tipp zum nächsten Schritt</div>
+      <div><kbd>M</kbd> Musik &nbsp; <kbd>V</kbd> Sprachausgabe</div>
+      <div><kbd>Leer</kbd> Text überspringen &nbsp; <kbd>Esc</kbd> abwählen</div>
+    </div>
+
+    <ul>
+      <li>Gegenstand unten im Inventar anklicken, dann das Ziel im Bild anklicken.</li>
+      <li>Der <b>Chron-o-John</b> spült Gegenstände durch die Jahrhunderte zu den anderen.</li>
+      <li>Rechtsklick auf ein Inventarstück beschreibt es.</li>
+    </ul>
+
+    <div class="btnrow"><button class="big" id="btnStart">Spiel starten</button></div>
+  </div>
+</div>
+
+<!-- ------------------------------ Auswahl ------------------------------ -->
+<div class="screen hidden" id="choiceScreen">
+  <div class="panel" style="max-width:460px">
+    <h1 style="font-size:21px" id="choiceTitle"></h1>
+    <p id="choiceText"></p>
+    <div class="btnrow" id="choiceBtns"></div>
+  </div>
+</div>
+
+<!-- -------------------------------- Ende ------------------------------- -->
+<div class="screen hidden" id="endScreen">
+  <div class="panel">
+    <h1 id="endTitle"></h1>
+    <p id="endText"></p>
+    <div class="btnrow"><button class="big" id="btnRestart">Noch mal spielen</button></div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error', function(e){
+  if(document.getElementById('err')) return;
+  var d = document.createElement('div'); d.id = 'err';
+  d.textContent = 'Fehler: ' + (e.message || e) + '\n' + (e.filename || '') + ':' + (e.lineno || '');
+  document.body.appendChild(d);
+  var b = document.getElementById('boot'); if(b) b.classList.add('hidden');
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/models.js"></script>
+<script src="js/world.js"></script>
+<script src="js/game.js"></script>
+<script>
+  if(window.Voice) Voice.init();
+</script>
+</body>
+</html>
