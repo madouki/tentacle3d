@@ -56,7 +56,7 @@ var CAM_ROOM = {
   attic: {x:0, y:7.6,  z:15.0, tx:0, ty:2.0, tz:-0.6}
 };
 var CAM = CAM_DEFAULT;
-var camShake = 0;
+var camShake = 0, camZoom = 0;
 
 var ambient = new THREE.AmbientLight(0xffffff, 0.34);
 var hemi    = new THREE.HemisphereLight(0xffffff, 0x444455, 0.30);
@@ -175,6 +175,7 @@ function buildRoom(){
     else if(r === 'lab')     amb = (e === 'future') ? 'buzz' : 'hum';
     else if(r === 'kitchen') amb = (e === 'past') ? 'crackle' : null;
     Snd.ambience(amb);
+    Snd.setIntensity(progress());
   }
 }
 
@@ -272,6 +273,7 @@ function switchTo(id){
   if(!S || id === S.who) return;
   me().x = actor.position.x; me().z = actor.position.z;
   clearSay(); Voice.shutUp();
+  Snd.charSting(id);
   fadeThen(function(){
     S.who = id; S.sel = null;
     buildRoom(); drawCast();
@@ -492,6 +494,7 @@ var API = {
   set: function(flag, val){
     S.f[flag] = (val === undefined) ? true : val;
     S.hintStep = null; S.hintLevel = 0;
+    if(Snd.ready) Snd.setIntensity(progress());
     setTimeout(rebuild, 0);
   },
   setQuiet: function(flag, val){ S.f[flag] = (val === undefined) ? true : val; },
@@ -502,6 +505,47 @@ var API = {
   wear: function(){ return wearCostume(); },
   win: winGame
 };
+
+/* ------------------------- Zielübersicht ----------------------------- */
+var goalScreen = document.getElementById('goalScreen');
+
+function openGoals(){
+  if(!S) return;
+  var list = document.getElementById('goalList');
+  var bar  = document.getElementById('goalBar');
+  var cnt  = document.getElementById('goalCount');
+  list.innerHTML = '';
+
+  var open = {};
+  openSteps().forEach(function(st){ open[st.id] = true; });
+
+  var done = 0, real = 0;
+  STEPS.forEach(function(st){
+    if(st.id === 'finale') return;
+    real++;
+    var isDone = st.done(S.f);
+    if(isDone) done++;
+    var d = document.createElement('div');
+    var state = isDone ? 'done' : (open[st.id] ? 'now' : 'later');
+    d.className = 'goal ' + state;
+    d.innerHTML =
+      '<span class="mark">' + (isDone ? '\u2713' : (open[st.id] ? '\u25B8' : '\u00B7')) + '</span>' +
+      '<span class="txt">' + (GOAL_TEXT[st.id] || st.id) + '</span>' +
+      '<span class="who" style="background:' + CH[st.who].ui + '">' + CH[st.who].initial + '</span>';
+    list.appendChild(d);
+  });
+
+  var pct = real ? Math.round(done / real * 100) : 0;
+  bar.style.width = pct + '%';
+  cnt.textContent = done + ' von ' + real + ' erledigt  ·  ' +
+                    eggFound() + ' von ' + eggTotal() + ' Anspielungen';
+  goalScreen.classList.remove('hidden');
+}
+function closeGoals(){ goalScreen.classList.add('hidden'); }
+function toggleGoals(){ goalScreen.classList.contains('hidden') ? openGoals() : closeGoals(); }
+
+document.getElementById('btnGoals').onclick = toggleGoals;
+document.getElementById('goalClose').onclick = closeGoals;
 
 /* ------------------------ Übersichtskarte ---------------------------- */
 var mapScreen = document.getElementById('mapScreen');
@@ -797,7 +841,7 @@ document.addEventListener('keydown', function(ev){
   var k = (ev.key || '').toLowerCase();
   if(k === 'f'){ ev.preventDefault(); toggleFullscreen(); return; }
   if(!S) return;
-  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); closeChrono(); closeMap(); }
+  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); closeChrono(); closeMap(); closeGoals(); }
   else if(k === 'h'){ showHint(); }
   else if(k === '1'){ switchTo('bernard'); }
   else if(k === '2'){ switchTo('hoagie'); }
@@ -809,6 +853,7 @@ document.addEventListener('keydown', function(ev){
   else if(k === 'c'){ openChrono(); }
   else if(k === 't'){ cycleSpeed(); }
   else if(k === 'k'){ toggleMap(); }
+  else if(k === 'j'){ toggleGoals(); }
   else if(dlgScreen && !dlgScreen.classList.contains('hidden') && /^[1-9]$/.test(k)){
     var btn = dlgOpts.children[parseInt(k,10) - 1];
     if(btn) btn.click();
@@ -937,6 +982,37 @@ var STEPS = [
     vague:'Alles ist vorbereitet. Zeit, nach Hause zu fahren.',
     exact:'Bernard: Ins Labor gehen und den Chron-o-John benutzen — ohne etwas ausgewählt zu haben.' }
 ];
+
+/* Kurztitel für die Zielübersicht — verrät das Ziel, nicht den Weg. */
+var GOAL_TEXT = {
+  'coal':          'Etwas Brennbares aus der Küche holen',
+  'coal-flush':    'Die Kohle ins Jahr 1776 schicken',
+  'cement':        'Etwas im frischen Zement verewigen',
+  'acorn':         'Eine Eichel auflesen',
+  'plant':         'Einen Baum an die Hauswand pflanzen',
+  'wine':          'Die Weinflasche von 1776 sichern',
+  'niche':         'Den Wein für Jahrhunderte einlagern',
+  'hamster':       'Auf den Dachboden kommen',
+  'hamster-flush': 'Den Hamster in die Zukunft schicken',
+  'wheel':         'Den Notstromgenerator antreiben',
+  'costume':       'Die Museumsvitrine leeren',
+  'disguise':      'An der Wache vorbeikommen',
+  'vinegar':       'Nachsehen, was aus dem Wein wurde',
+  'cornerstone':   'Den Eckstein öffnen',
+  'diamond-flush': 'Den Diamanten in die Gegenwart schicken',
+  'install':       'Den Antrieb der Zeitmaschine bestücken',
+  'wrench':        'Werkzeug aus der Werkstatt besorgen',
+  'wrench-flush':  'Das Werkzeug in die Gegenwart schicken',
+  'valve':         'Den Giftschlamm stoppen',
+  'finale':        'Nach Hause fahren'
+};
+
+/* Anteil erledigter Ziele, ohne das Finale. */
+function progress(){
+  var real = STEPS.filter(function(st){ return st.id !== 'finale'; });
+  var done = real.filter(function(st){ return st.done(S.f); }).length;
+  return real.length ? done / real.length : 0;
+}
 
 function openSteps(){
   return STEPS.filter(function(st){
@@ -1264,6 +1340,28 @@ function animate(){
     o.geometry.computeVertexNormals();
   }
 
+  /* Regen fällt, Nebel zieht */
+  if((o = roomGroup.getObjectByName('rain')) && o.geometry.attributes){
+    var rp = o.geometry.attributes.position, drop = o.userData.speed * dt, top = o.userData.height;
+    for(var ri=0; ri<rp.count; ri+=2){
+      rp.array[ri*3+1]     -= drop;
+      rp.array[(ri+1)*3+1] -= drop;
+      if(rp.array[(ri+1)*3+1] < -1){
+        rp.array[ri*3+1]     = top;
+        rp.array[(ri+1)*3+1] = top - 0.55;
+      }
+    }
+    rp.needsUpdate = true;
+  }
+  if((o = roomGroup.getObjectByName('mist'))){
+    for(var mi2=0; mi2<o.children.length; mi2++){
+      var sw = o.children[mi2];
+      sw.position.x += sw.userData.drift * dt;
+      if(sw.position.x > 22) sw.position.x = -22;
+      sw.material.opacity = 0.045 + Math.sin(t*0.4 + mi2)*0.025;
+    }
+  }
+
   /* Angestupstes Objekt schwingt kurz nach */
   if(nudge){
     nudge.t -= dt;
@@ -1308,12 +1406,17 @@ function animate(){
   /* --- Kamera: leichtes Atmen und Erschütterung --- */
   var shake = camShake > 0 ? camShake : 0;
   if(camShake > 0) camShake = Math.max(0, camShake - dt*1.4);
+
+  /* Während gesprochen wird, rückt die Kamera ein Stück näher heran. */
+  var wantZoom = sayActive ? 1 : 0;
+  camZoom += (wantZoom - camZoom) * Math.min(1, dt * 1.8);
+
   camera.position.set(
     CAM.x + Math.sin(t*0.31)*0.18 + (Math.random()-0.5)*shake*0.5,
-    CAM.y + Math.sin(t*0.23)*0.10 + (Math.random()-0.5)*shake*0.5,
-    CAM.z
+    CAM.y + Math.sin(t*0.23)*0.10 + (Math.random()-0.5)*shake*0.5 - camZoom*0.45,
+    CAM.z - camZoom*1.35
   );
-  camera.lookAt(CAM.tx, CAM.ty, CAM.tz);
+  camera.lookAt(CAM.tx, CAM.ty + camZoom*0.10, CAM.tz);
 
   renderer.render(scene, camera);
 }

@@ -280,6 +280,7 @@ var TRACKS = {
 var Snd = {
   ctx:null, master:null, musicBus:null, musicGain:null, sfxBus:null,
   on:true, ready:false, ducked:false,
+  intensity:0,                                     // wächst mit dem Spielfortschritt
   _track:null, _era:null, _sec:0, _step:0, _next:0, _timer:null,
 
   init:function(){
@@ -328,6 +329,12 @@ var Snd = {
   },
 
   resume:function(){ if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+
+  /* Je weiter das Spiel, desto voller die Musik: eine Oktavstimme legt
+     sich über die Melodie, später kommen leise Akzente dazu.            */
+  setIntensity:function(v){
+    this.intensity = Math.max(0, Math.min(1, v || 0));
+  },
 
   /* Wie klingt der Raum? Keller dumpf, Hof offen, Dachboden gedämpft. */
   setSpace:function(room){
@@ -427,8 +434,21 @@ var Snd = {
 
       for(var v=0; v<sec.voices.length; v++){
         var voice = sec.voices[v], n = voice.seq[s];
-        if(n && n !== '.') this.note(hz(n), when, voice.dur,
+        if(!n || n === '.') continue;
+        this.note(hz(n), when, voice.dur,
           {type:voice.type, gain:voice.gain, cut:voice.cut, atk:voice.atk});
+        /* Oktavstimme über der Melodie, sobald genug erreicht ist */
+        if(v === 0 && this.intensity > 0.05){
+          this.note(hz(n) * 2, when, voice.dur * 0.8, {
+            type:'sine', gain:voice.gain * 0.34 * this.intensity,
+            cut:(voice.cut || 3000) * 1.4, atk:0.02
+          });
+        }
+      }
+      /* Leiser Akzent auf der Eins, wenn es schon weit gediehen ist */
+      if(this.intensity > 0.55 && !sec.drums && s % 16 === 0){
+        this.noise(when, 0.10, {filter:'lowpass', freq:240, sweep:60,
+                                gain:0.09 * this.intensity, bus:this.musicBus});
       }
       if(sec.drums){
         var hit = sec.drums[s % sec.drums.length];
@@ -514,6 +534,22 @@ var Snd = {
         this.noise(t, 0.9, {filter:'bandpass', freq:420, sweep:900, q:3, gain:0.09, shape:1, bus:B});
         break;
     }
+  },
+
+  /* Ein kurzes Motiv je Figur — der Wechsel wird hörbar */
+  charSting:function(who){
+    if(!this.ready || !this.on) return;
+    var t = this.ctx.currentTime, B = this.sfxBus, self = this;
+    var M = {
+      bernard:{notes:['E5','G5','B5'],  type:'square',   gain:0.075, dur:0.20, step:0.075},
+      hoagie: {notes:['G2','D3','G3'],  type:'sawtooth', gain:0.090, dur:0.34, step:0.105},
+      laverne:{notes:['A4','C#5','E5'], type:'triangle', gain:0.080, dur:0.22, step:0.070}
+    }[who];
+    if(!M) return;
+    M.notes.forEach(function(nn, i){
+      self.note(hz(nn), t + i*M.step, M.dur,
+        {type:M.type, gain:M.gain, cut:5200, bus:B});
+    });
   },
 
   /* Die vier Töne eines gewissen Webstuhls */

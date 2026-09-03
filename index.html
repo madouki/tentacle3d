@@ -30,6 +30,7 @@
   <button class="tool" id="btnVoice" title="Sprachausgabe an/aus (V)">&#128483;</button>
   <button class="tool" id="btnSubs"  title="Untertitel an/aus (U)">CC</button>
   <button class="tool" id="btnSpeed" title="Texttempo (T)">&#128172;</button>
+  <button class="tool" id="btnGoals" title="Ziele und Fortschritt (J)">&#9745;</button>
   <button class="tool" id="btnMap"   title="Übersichtskarte (K)">&#127757;</button>
   <button class="tool" id="btnLog"   title="Gesprächsprotokoll (L)">&#128220;</button>
   <button class="tool" id="btnHint"  title="Tipp (H)">?</button>
@@ -42,6 +43,18 @@
   <button id="btnChrono" title="Chron-o-John öffnen (C)">
     <span class="cj-ic">&#128701;</span><span class="cj-lb">Chron-o-John</span>
   </button>
+</div>
+
+<!-- ----------------------------- Zielübersicht ------------------------- -->
+<div class="screen hidden" id="goalScreen">
+  <div class="panel" style="max-width:560px">
+    <h1 style="font-size:22px">WIE WEIT SIND WIR?</h1>
+    <h2 id="goalCount"></h2>
+    <div class="goal-track"><div class="goal-bar" id="goalBar"></div></div>
+    <div id="goalList"></div>
+    <p class="map-note">Erledigt &#10003; &nbsp;·&nbsp; jetzt möglich &#9656; &nbsp;·&nbsp; kommt später &#183;</p>
+    <div class="btnrow"><button class="big alt" id="goalClose">Schließen</button></div>
+  </div>
 </div>
 
 <!-- ---------------------------- Übersichtskarte ------------------------ -->
@@ -109,6 +122,7 @@
       <div><kbd>C</kbd> Chron-o-John öffnen</div>
       <div><kbd>T</kbd> Texttempo umschalten</div>
       <div><kbd>K</kbd> Karte: wer ist wo</div>
+      <div><kbd>J</kbd> Ziele und Fortschritt</div>
       <div><kbd>Leer</kbd> Text überspringen</div>
       <div><kbd>Esc</kbd> Auswahl abbrechen</div>
     </div>

@@ -122,7 +122,7 @@ function shellInterior(g, E, opts){
   // Zwei schräge Lichtbahnen von oben — gibt dem Raum Tiefe
   var shaftCol = o.panel ? 0x8affd0 : 0xfff0c0;
   for(var sx=-1; sx<=1; sx+=2){
-    var sh = M.lightShaft(0.7, 2.5, 11, shaftCol, o.panel ? 0.040 : 0.055);
+    var sh = M.lightShaft(0.55, 1.9, 11, shaftCol, o.panel ? 0.030 : 0.040);
     sh.position.set(sx*4.6, 4.6, -2.2);
     sh.rotation.z = sx * 0.19;
     g.add(sh);
@@ -606,6 +606,11 @@ function buildYard(era, S, g, HS, A){
   g.add(M.motes(era === 'future' ? 130 : 70, 26, 7,
                 era === 'future' ? 0x8affd0 : 0xffe08a,
                 era === 'future' ? 0.13 : 0.11));
+  if(era === 'future'){
+    g.add(M.rain(600, 46, 20, 0x9fd8ff));           // die Zukunft ist nass
+  } else if(era === 'past'){
+    g.add(M.mist(7, 34, 0.5, 0xe4eef6));            // Morgendunst über 1776
+  }
   g.add(M.clouds(8, era === 'future' ? 0x6a4a8c : 0xf4f6fa, 10.5, 66));
   g.add(M.birds(era === 'future' ? 2 : 4, era === 'future' ? 0x2a1a3a : 0x2e2e34));
 

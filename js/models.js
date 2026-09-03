@@ -667,5 +667,56 @@ M.clutterShelf = function(w, colorA, colorB){
   return g;
 };
 
+
+/* ======================================================================
+   9. Wetter, Vordergrund, Spiegelung
+   ====================================================================== */
+
+/* Regen als fallende Striche.  Jeder Tropfen ist ein kurzes Liniensegment,
+   das unten wieder oben ansetzt — billig und liest sich sofort als Regen. */
+M.rain = function(count, spread, height, color){
+  var geo = new THREE.BufferGeometry();
+  var pos = new Float32Array(count * 6);            // zwei Punkte je Tropfen
+  var len = 0.55;
+  for(var i=0;i<count;i++){
+    var x = (Math.random()-0.5)*spread;
+    var y = Math.random()*height;
+    var z = (Math.random()-0.5)*spread*0.8 - 2;
+    pos[i*6]   = x;       pos[i*6+1] = y;       pos[i*6+2] = z;
+    pos[i*6+3] = x + 0.06; pos[i*6+4] = y - len; pos[i*6+5] = z;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  var m = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+    color: color || 0x9fd8ff, transparent:true, opacity:0.34, depthWrite:false
+  }));
+  m.name = 'rain';
+  m.userData.height = height;
+  m.userData.speed = 13;
+  m.raycast = function(){};                          // niemals anklickbar
+  return m;
+};
+
+/* Bodennebel: ein paar große, fast durchsichtige Schwaden */
+M.mist = function(count, spread, y, color){
+  var g = M.grp();
+  g.name = 'mist';
+  for(var i=0;i<count;i++){
+    var pl = new THREE.Mesh(
+      new THREE.PlaneGeometry(9 + Math.random()*7, 3.4 + Math.random()*2),
+      new THREE.MeshBasicMaterial({
+        color: color || 0xdfeaf4, transparent:true,
+        opacity: 0.05 + Math.random()*0.05, depthWrite:false
+      })
+    );
+    pl.position.set((Math.random()-0.5)*spread, y + Math.random()*1.4,
+                    -6 + Math.random()*12);
+    pl.rotation.x = -0.15;
+    pl.userData.drift = 0.10 + Math.random()*0.22;
+    pl.raycast = function(){};
+    g.add(pl);
+  }
+  return g;
+};
+
 global.M = M;
 })(window);
