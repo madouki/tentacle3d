@@ -35,6 +35,7 @@ Diamanten.
 | <kbd>L</kbd> | Gesprächsprotokoll |
 | <kbd>C</kbd> | Chron-o-John von überall öffnen |
 | <kbd>T</kbd> | Texttempo umschalten (bis "nur weiterklicken") |
+| <kbd>K</kbd> | Karte: wer steht gerade wo |
 | <kbd>F</kbd> | Vollbild |
 | <kbd>Leertaste</kbd> / <kbd>Esc</kbd> | Text überspringen / Auswahl abbrechen |
 
@@ -42,6 +43,13 @@ Das Spiel startet direkt im Vollbild. Der **Chron-o-John** im Labor spült Gegen
 die Jahrhunderte zu den anderen beiden — das ist der Kern jedes Rätsels. Der Knopf unten
 rechts (oder <kbd>C</kbd>) öffnet ihn von jedem Raum aus; steht die Figur woanders, geht sie
 zuerst ins Labor. Im Panel wählt man Gegenstand und Empfänger und spült in einem Zug.
+
+Die **Karte** (<kbd>K</kbd>) legt Zeit und Ort als Raster übereinander: drei Zeilen für die
+drei Epochen, fünf Spalten für die Räume. Man sieht auf einen Blick, wer wo steht — und ein
+Klick reist dorthin. Trifft er eine fremde Zeile, wechselt er zugleich die Figur.
+
+Zwei Gegenstände nacheinander im Inventar anzuklicken versucht, sie zu **kombinieren**. Meist
+kommt dabei nur ein guter Spruch heraus, aber probieren lohnt sich.
 
 Mit einigen Figuren lässt sich **richtig reden**: Der Gründervater, das Wach-Tentakel und das
 lila Tentakel haben Antwortbäume, die sich je nach Spielstand ändern. Antworten wählt man per
@@ -59,6 +67,11 @@ Klick oder Zifferntaste.
   mit Schlagzeug und Zwischenspiel für die Gegenwart, Sägezahn-Synth in c-Moll für 2200.
   Dazu ein eigenes Titelthema, ein Abspannstück in Dur, weiche Übergänge beim
   Epochenwechsel und automatisches Absenken, sobald jemand spricht.
+- **Ein Leitmotiv durch die Zeiten**: Dieselbe Melodie taucht in jeder Epoche im jeweiligen
+  Gewand auf — als Cembalo-Verzierung 1776, als entspannte Lounge-Linie in der Gegenwart,
+  als verzerrte Synth-Fassung 2200.
+- **Die Musik erzählt mit**: Sobald das Ventil zu ist und die Tentakelherrschaft nie
+  stattgefunden hat, spielt die Zukunft dasselbe Thema in Dur.
 - **Raumklang**: Ein Filter passt die Musik dem Schauplatz an — im Keller dumpf, auf dem
   Dachboden gedämpft, im Hof offen.
 - **Sprachausgabe** über die Web Speech API — jede Figur mit eigener Stimme, Tonhöhe und
@@ -74,6 +87,10 @@ Klick oder Zifferntaste.
   kreisende Vögel, blinzelnde Figuren, Blenden beim Raumwechsel
 - **Hervorhebung beim Überfahren**: Anklickbares leuchtet leicht auf, statt nur oben
   benannt zu werden
+- **Eigene Tageszeit je Epoche**: tiefe Morgensonne mit langen Schatten 1776, hoher Mittag
+  in der Gegenwart, kaltes Seitenlicht 2200
+- **Fluss mit echten Wellen** (verschobene Vertices), Greifbewegung beim Aufheben,
+  angestupste Objekte schwingen nach, Lichtblitz beim Sprung durch die Zeit
 
 ## Lokal starten
 

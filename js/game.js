@@ -69,6 +69,14 @@ key.shadow.camera.top  =  20; key.shadow.camera.bottom = -20;
 key.shadow.camera.near = 1;   key.shadow.camera.far = 60;
 key.shadow.bias = -0.0016;
 key.shadow.normalBias = 0.03;
+/* Jede Epoche hat ihre Tageszeit: 1776 tiefe Morgensonne mit langen
+   Schatten, Gegenwart hoher Mittag, 2200 kaltes Licht von der Seite. */
+var SUN = {
+  past:    {pos:[12, 9.5, 15], mul:1.00},
+  present: {pos:[8, 18, 11],   mul:1.00},
+  future:  {pos:[-11, 10, 7],  mul:0.92}
+};
+
 var fill = new THREE.DirectionalLight(0xffffff, 0.16); fill.position.set(-9, 7, 8);
 var rim  = new THREE.DirectionalLight(0xffffff, 0.24); rim.position.set(-3, 8, -12);
 scene.add(ambient, hemi, key, fill, rim);
@@ -85,6 +93,8 @@ var ndc = new THREE.Vector2();
 var hotspots = [];
 var actor = null, actorShadow = null;
 var walk = {active:false, tx:0, tz:0, phase:0, then:null, stepAcc:0};
+var armRaise = 0;                                  // Greifbewegung beim Aufheben
+var nudge = null;                                  // angestupstes Objekt
 var bounds = W.BOUND;
 
 function clearGroup(g){
@@ -126,7 +136,10 @@ function buildRoom(){
   hemi.color.set(E.hemiSky); hemi.groundColor.set(E.hemiGnd);
   hemi.intensity = 0.30 * dim;
   key.color.set(E.key);
-  key.intensity = (r === 'yard' ? E.keyI * 1.05 : E.keyI * 0.85) * (r === 'cellar' ? 0.30 : 1.0);
+  var sun = SUN[e] || SUN.present;
+  key.position.set(sun.pos[0], sun.pos[1], sun.pos[2]);
+  key.intensity = (r === 'yard' ? E.keyI * 1.05 : E.keyI * 0.85) *
+                  (r === 'cellar' ? 0.30 : 1.0) * sun.mul;
   fill.color.set(E.hemiSky);
   rim.color.set(e === 'future' ? 0x8ad8ff : 0xffe6c0);
   scene.fog = (r === 'yard')
@@ -154,7 +167,7 @@ function buildRoom(){
   hovered = null; hoveredRec = null; setStatus('');
   drawInv();
   if(Snd.ready){
-    Snd.play(e); Snd.setSpace(r);
+    Snd.play(eraTrack(e)); Snd.setSpace(r);
     var amb = null;
     if(r === 'yard')         amb = (e === 'future') ? 'buzz' : 'birds';
     else if(r === 'cellar')  amb = 'drip';
@@ -163,6 +176,11 @@ function buildRoom(){
     else if(r === 'kitchen') amb = (e === 'past') ? 'crackle' : null;
     Snd.ambience(amb);
   }
+}
+
+/* In der befreiten Zukunft spielt dasselbe Thema — nur in Dur. */
+function eraTrack(e){
+  return (e === 'future' && S && S.f.valveClosed) ? 'future_free' : e;
 }
 
 function rebuild(){
@@ -201,6 +219,15 @@ function drawInv(){
     b.setAttribute('data-name', it.name);
     b.title = it.name;
     b.onclick = function(){
+      if(S.sel && S.sel !== id){                    // zwei Gegenstände kombinieren
+        var txt = W.combo(S.sel, id);
+        var a = ITEMS[S.sel].name, bn = ITEMS[id].name;
+        clearSay();
+        say(txt || (a + ' und ' + bn + ' wollen nichts miteinander zu tun haben.'), 'sys');
+        Snd.sfx(txt ? 'pick' : 'no');
+        S.sel = null; drawInv(); setStatus('');
+        return;
+      }
       S.sel = (S.sel === id) ? null : id;
       drawInv(); setStatus('');
     };
@@ -222,6 +249,15 @@ function drawCast(){
     b.onclick = function(){ switchTo(id); };
     elCast.appendChild(b);
   });
+}
+
+var elFlash = document.getElementById('flash');
+function flash(){
+  if(!elFlash) return;
+  elFlash.classList.remove('on');
+  void elFlash.offsetWidth;
+  elFlash.classList.add('on');
+  setTimeout(function(){ elFlash.classList.remove('on'); }, 520);
 }
 
 function fadeThen(fn){
@@ -368,6 +404,8 @@ function doFlush(item, target){
   API.drop(S.who, item); API.give(target, item);
   S.sel = null; drawInv(); setStatus('');
   Snd.sfx('flush');
+  Snd.sfx('warp');
+  flash();
   say('SCHWUPP. Der Chron-o-John spült den Gegenstand durch die Jahrhunderte.', 'sys');
   say('[' + ITEMS[item].name + ' ist bei ' + CH[target].name + ' angekommen.]', 'sys');
   var b = roomGroup.getObjectByName('cjBulb');
@@ -444,7 +482,7 @@ var API = {
   egg: foundEgg,
   give: function(who, item){
     if(!has(who, item)) S.chars[who].inv.push(item);
-    if(who === S.who) drawInv();
+    if(who === S.who){ drawInv(); armRaise = 1; }
   },
   drop: function(who, item){
     var i = S.chars[who].inv.indexOf(item);
@@ -464,6 +502,71 @@ var API = {
   wear: function(){ return wearCostume(); },
   win: winGame
 };
+
+/* ------------------------ Übersichtskarte ---------------------------- */
+var mapScreen = document.getElementById('mapScreen');
+var mapGrid   = document.getElementById('mapGrid');
+
+function mapCell(cls, html, title){
+  var d = document.createElement('div');
+  d.className = cls;
+  if(html) d.innerHTML = html;
+  if(title) d.title = title;
+  return d;
+}
+
+function openMap(){
+  if(!S) return;
+  mapGrid.innerHTML = '';
+
+  var head = mapCell('map-row map-head', '');
+  head.appendChild(mapCell('map-era', ''));
+  W.ROOM_ORDER.forEach(function(r){
+    head.appendChild(mapCell('map-col', W.ROOM_SHORT[r]));
+  });
+  mapGrid.appendChild(head);
+
+  W.CHAR_IDS.forEach(function(id){
+    var c = CH[id], st = S.chars[id];
+    var row = mapCell('map-row', '');
+    row.appendChild(mapCell('map-era',
+      '<span class="dot" style="background:' + c.ui + '"></span>' + W.ERA_SHORT[c.era],
+      c.name));
+
+    W.ROOM_ORDER.forEach(function(r){
+      var here = st.room === r;
+      var open = W.canEnter(r, c.era, S);
+      var b = document.createElement('button');
+      b.className = 'map-cell' + (here ? ' here' : '') + (open ? '' : ' locked');
+      b.innerHTML = here
+        ? '<span class="who" style="background:' + c.ui + '">' + c.initial + '</span>'
+        : (open ? '<span class="pip"></span>' : '');
+      b.title = W.ROOM_LABEL[r][c.era] + (open ? '' : ' — von hier nicht erreichbar');
+      if(open && !here) b.onclick = function(){ mapGo(id, r); };
+      else if(here && id !== S.who) b.onclick = function(){ mapGo(id, r); };
+      row.appendChild(b);
+    });
+    mapGrid.appendChild(row);
+  });
+
+  mapScreen.classList.remove('hidden');
+}
+
+function mapGo(who, room){
+  closeMap();
+  if(who !== S.who){
+    switchTo(who);
+    setTimeout(function(){ if(me().room !== room) changeRoom(room); }, 420);
+  } else if(me().room !== room){
+    changeRoom(room);
+  }
+}
+
+function closeMap(){ mapScreen.classList.add('hidden'); }
+function toggleMap(){ mapScreen.classList.contains('hidden') ? openMap() : closeMap(); }
+
+document.getElementById('btnMap').onclick = toggleMap;
+document.getElementById('mapClose').onclick = closeMap;
 
 /* ------------------- Chron-o-John: Schnellzugriff -------------------- */
 var chronoScreen = document.getElementById('chronoScreen');
@@ -579,6 +682,7 @@ function runAction(hs, verb){
 
   if(verb === 'use' && S.sel){ S.sel = null; drawInv(); }
   setStatus('');
+  if(hs.obj && verb !== 'look' && !hs.actions.door) nudge = {obj:hs.obj, t:0.42};
   if(out) say(out);
 }
 
@@ -693,7 +797,7 @@ document.addEventListener('keydown', function(ev){
   var k = (ev.key || '').toLowerCase();
   if(k === 'f'){ ev.preventDefault(); toggleFullscreen(); return; }
   if(!S) return;
-  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); closeChrono(); }
+  if(k === 'escape'){ S.sel = null; drawInv(); setStatus(''); closeLog(); closeChrono(); closeMap(); }
   else if(k === 'h'){ showHint(); }
   else if(k === '1'){ switchTo('bernard'); }
   else if(k === '2'){ switchTo('hoagie'); }
@@ -704,6 +808,7 @@ document.addEventListener('keydown', function(ev){
   else if(k === 'l'){ toggleLog(); }
   else if(k === 'c'){ openChrono(); }
   else if(k === 't'){ cycleSpeed(); }
+  else if(k === 'k'){ toggleMap(); }
   else if(dlgScreen && !dlgScreen.classList.contains('hidden') && /^[1-9]$/.test(k)){
     var btn = dlgOpts.children[parseInt(k,10) - 1];
     if(btn) btn.click();
@@ -926,7 +1031,7 @@ function toggleMusic(){
   Snd.init(); Snd.resume();
   var on = Snd.toggle();
   btnMusic.classList.toggle('off', !on);
-  if(on) Snd.play(S ? era() : 'title');
+  if(on) Snd.play(S ? eraTrack(era()) : 'title');
 }
 function toggleVoice(){
   var on = Voice.toggle();
@@ -1078,6 +1183,14 @@ function animate(){
       } else {
         p.head.rotation.x *= 0.86;
       }
+      if(armRaise > 0){                             // greift nach etwas
+        armRaise = Math.max(0, armRaise - dt*2.1);
+        var reach = Math.sin((1 - armRaise) * Math.PI);
+        p.armR.rotation.x = -reach * 1.45;
+        p.torso.rotation.x = reach * 0.12;
+      } else {
+        p.torso.rotation.x *= 0.88;
+      }
       /* Blinzeln */
       blinkTimer -= dt;
       if(blinkTimer <= 0){ blinkPhase = 0.16; blinkTimer = 2.4 + Math.random()*4.0; }
@@ -1138,6 +1251,28 @@ function animate(){
     }
   }
   if((o = roomGroup.getObjectByName('dust'))) o.rotation.y = t*0.03;
+
+  /* Fluss mit echten Wellen */
+  if((o = roomGroup.getObjectByName('river')) && o.userData.wave && o.geometry.attributes){
+    var pa = o.geometry.attributes.position, wb = o.userData.wave;
+    for(var vi=0; vi<pa.count; vi++){
+      var vx = wb[vi*3], vy = wb[vi*3+1];
+      pa.array[vi*3+2] = wb[vi*3+2] + Math.sin(vx*0.55 + t*1.7)*0.14
+                                    + Math.cos(vy*0.9  + t*1.15)*0.07;
+    }
+    pa.needsUpdate = true;
+    o.geometry.computeVertexNormals();
+  }
+
+  /* Angestupstes Objekt schwingt kurz nach */
+  if(nudge){
+    nudge.t -= dt;
+    if(nudge.t <= 0){ nudge.obj.scale.set(1,1,1); nudge = null; }
+    else {
+      var k2 = 1 + Math.sin((0.42 - nudge.t) * 26) * nudge.t * 0.10;
+      nudge.obj.scale.set(k2, k2, k2);
+    }
+  }
   if((o = roomGroup.getObjectByName('motes')) && o.geometry){
     var pos = o.geometry.attributes.position, base = o.userData.base, seed = o.userData.seed;
     if(base && seed){
@@ -1193,7 +1328,7 @@ function startGame(){
   drawCast();
   buildRoom();
   resize();
-  Snd.init(); Snd.resume(); Snd.play(era());
+  Snd.init(); Snd.resume(); Snd.play(eraTrack(era()));
   say('Der Chron-o-John ist explodiert. Bernard steckt in der Gegenwart fest.', 'sys');
   say('"Hoagie? Laverne? Hört ihr mich? … Natürlich nicht. Ihr seid zweihundert Jahre weit weg."', 'bernard');
   say('Oben links wechselst du die Figur, unten liegt dein Inventar. H gibt einen Tipp.', 'sys');
@@ -1204,7 +1339,7 @@ document.getElementById('btnStart').onclick = function(){
   goFullscreen();
   Snd.init(); Snd.resume();
   Voice.init();
-  if(!S) startGame(); else Snd.play(era());
+  if(!S) startGame(); else Snd.play(eraTrack(era()));
 };
 document.getElementById('btnRestart').onclick = function(){
   document.getElementById('endScreen').classList.add('hidden');

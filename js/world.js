@@ -468,9 +468,14 @@ function buildYard(era, S, g, HS, A){
       }
     });
 
-    var riv = M.box(40,0.12,3.6, S.f.valveClosed ? 0x3f7fbf : 0x5f9f4f, 0, 0.07, 7.2,
-      {opacity:0.88, emissive: S.f.valveClosed ? 0x0a2438 : 0x1a3a10, noShadow:true});
+    var rivGeo = new THREE.PlaneGeometry(44, 4.2, 44, 5);
+    var riv = new THREE.Mesh(rivGeo, M.mat(S.f.valveClosed ? 0x3f7fbf : 0x5f9f4f,
+      {opacity:0.88, emissive: S.f.valveClosed ? 0x0a2438 : 0x1a3a10}));
+    riv.rotation.x = -Math.PI/2;
+    riv.position.set(0, 0.09, 7.2);
+    riv.castShadow = false; riv.receiveShadow = false;
     riv.name = 'river';
+    riv.userData.wave = rivGeo.attributes.position.array.slice(0);
     HS('Fluss', riv, 0, 4.6, {
       primary:'look',
       look:function(){
@@ -1291,11 +1296,42 @@ function buildAttic(era, S, g, HS, A){
   placeEggs('attic', era, S, g, HS, A);
 }
 
+/* ======================================================================
+   Gegenstand auf Gegenstand — meist nur ein guter Spruch
+   ====================================================================== */
+W.COMBOS = {
+  'coal|wine':      'Kohle in den Wein? Das ergäbe den mit Abstand schlechtesten Jahrgang der Geschichte.',
+  'chicken|hamster':'Chuck beschnuppert das Gummihuhn ausgiebig und wirkt danach zutiefst beleidigt.',
+  'costume|hamster':'Ein Hamster im Tentakelkostüm. Verlockend. Aber nein.',
+  'diamond|wrench': 'Kurz zuckt die Hand. Nein — Diamanten schlägt man nicht mit Werkzeug.',
+  'chicken|vinegar':'Der Essig zischt am Gummi. Das Huhn quietscht vorwurfsvoll.',
+  'acorn|hamster':  'Chuck nimmt die Eichel, dreht sie einmal und gibt sie zurück. Zu groß für seine Backen.',
+  'acorn|coal':     'Eine Eichel und ein Klumpen Kohle. Beide brauchen vor allem eines: sehr viel Zeit.',
+  'diamond|vinegar':'Der Essig perlt am Diamanten ab. Kohlenstoff lässt sich nicht beeindrucken.',
+  'coal|wrench':    'Man könnte die Kohle zerschlagen. Man hätte dann sehr kleine Kohle.',
+  'costume|chicken':'Ein Gummihuhn im Tentakelkostüm wäre die perfekte Tarnung — für ein Gummihuhn.',
+  'diamond|hamster':'Chuck begutachtet den Diamanten fachmännisch und findet ihn ungenießbar.',
+  'vinegar|wine':   'Alt und jung im selben Griff. Der eine wird noch, der andere war mal.',
+  'costume|diamond':'Ein Tentakel mit Diamant. Ziemlich protzig, selbst für die Zukunft.',
+  'chicken|wrench': 'Werkzeug trifft Gummihuhn. Das Huhn gewinnt nach Punkten.',
+  'acorn|wine':     'Eiche und Wein. In zweihundert Jahren stehen beide gut da.'
+};
+
+W.combo = function(a, b){
+  var k = [a, b].sort().join('|');
+  return W.COMBOS[k] || null;
+};
+
 /* ---------------------------------------------------------------------- */
 W.BUILDERS = {yard:buildYard, kitchen:buildKitchen, lab:buildLab,
               attic:buildAttic, cellar:buildCellar};
 
 /* Erreichbarkeit: Der Dachboden hängt am Baum. */
+/* Reihenfolge und Kurznamen für die Übersichtskarte */
+W.ROOM_ORDER = ['yard','kitchen','lab','cellar','attic'];
+W.ROOM_SHORT = {yard:'Hof', kitchen:'Küche', lab:'Labor', cellar:'Keller', attic:'Dachboden'};
+W.ERA_SHORT  = {past:'1776', present:'Gegenwart', future:'2200'};
+
 W.canEnter = function(room, era, S){
   if(room !== 'attic') return true;
   if(!S.f.treePlanted) return false;

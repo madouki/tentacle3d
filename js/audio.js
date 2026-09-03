@@ -81,7 +81,7 @@ var TRACKS = {
 
   /* ---------- 1776: Cembalo-Menuett mit Basso continuo ---------- */
   past: {
-    bpm:126, order:[0,0,1,2,0,3],
+    bpm:126, order:[0,0,1,3,2,0,4],
     sections:[
       { voices:[
         {type:'triangle', gain:0.15, dur:0.20, cut:3000, seq:S(
@@ -113,6 +113,17 @@ var TRACKS = {
           "G2 . . .  . . . .   D3 . . .  . . . . " +
           "A2 . . .  . . . .   D2 . . .  . . . . ")}
       ]},
+      { voices:[                                   /* Leitmotiv, cembalistisch verziert */
+        {type:'triangle', gain:0.145, dur:0.26, cut:3000, seq:S(
+          "D5 E5 D5 . A4 . . .  F4 G4 F4 . C5 . . . " +
+          "A#4 . . . F4 . . .   G4 A4 G4 . D4 . . . ")},
+        {type:'square', gain:0.035, dur:0.16, cut:1900, seq:S(
+          "D4 . . .  A3 . . .  F4 . . .  C4 . . . " +
+          "A#3 . . . F3 . . .  G3 . . .  D3 . . . ")},
+        {type:'triangle', gain:0.05, dur:0.44, cut:1000, seq:S(
+          "D2 . A2 . D3 . A2 .  F2 . C3 . F3 . C3 . " +
+          "A#1 . F2 . A#2 . F2 . G2 . D3 . G2 . D2 . ")}
+      ]},
       { voices:[                                   /* Kanon: zwei Stimmen versetzt */
         {type:'triangle', gain:0.13, dur:0.18, cut:3200, seq:S(
           "D5 . C#5 . B4 . A4 .  G4 . F#4 . E4 . D4 . " +
@@ -129,7 +140,7 @@ var TRACKS = {
 
   /* ---------- Gegenwart: Lounge-Groove, Em–C–G–D ---------- */
   present: {
-    bpm:94, order:[0,0,1,0,2,1],
+    bpm:94, order:[0,0,1,2,0,3,1],
     sections:[
       { drums:S("K . . . . . H . S . . . . . H . K . . K . . H . S . . . . H . H"),
         voices:[
@@ -154,6 +165,18 @@ var TRACKS = {
         {type:'sine', gain:0.05, dur:0.9, cut:1800, seq:S(
           "E5 . . .  . . D5 . . . . .  B4 . . . " +
           ". . . .   A4 . . . . . . .  . . . . ")}
+      ]},
+      { drums:S("K . . . . . H . S . . . . . H . K . . . . . H . S . . . . H . ."),
+        voices:[                                   /* Leitmotiv, ganz entspannt */
+        {type:'sine', gain:0.115, dur:1.1, cut:2100, seq:S(
+          "D5 . . .  . . A4 .  . . . .  F4 . . . " +
+          "C5 . . .  . . A#4 . . . . .  D4 . . . ")},
+        {type:'triangle', gain:0.09, dur:0.36, cut:820, seq:S(
+          "D2 . . .  A2 . . .  F2 . . .  C2 . . . " +
+          "A#1 . . . F2 . . .  G2 . . .  D2 . . . ")},
+        {type:'sine', gain:0.042, dur:1.8, cut:1500, seq:S(
+          "F#4 . . . . . . .  A4 . . .  . . . . " +
+          "D4 . . .  . . . .  A4 . . .  . . . . ")}
       ]},
       { drums:S("K . . . H . S . . H K . . . S . K . . H . . S . . . K . S . H ."),
         voices:[                                   /* Zwischenspiel, luftiger */
@@ -206,6 +229,46 @@ var TRACKS = {
         {type:'sawtooth', gain:0.07, dur:0.9, cut:400, seq:S(
           "C2 . . .  . . . .  . . . .  . . . . " +
           "G#1 . . . . . . .  . . . .  . . . . ")}
+      ]},
+      { drums:S("K . . . . . . . S . . . . . K . K . . . . . . . S . . . . S . ."),
+        voices:[                                   /* Leitmotiv, bedrohlich verzerrt */
+        {type:'sawtooth', gain:0.085, dur:0.5, cut:1600, seq:S(
+          "D5 . . .  . . A4 .  . . . .  F4 . . . " +
+          "A#4 . . . . . F4 .  . . . .  D4 . . . ")},
+        {type:'sawtooth', gain:0.10, dur:0.40, cut:460, seq:S(
+          "D2 . . .  . . . .  D2 . . .  F2 . . . " +
+          "A#1 . . . . . . .  A#1 . . . D2 . . . ")},
+        {type:'square', gain:0.030, dur:0.13, cut:1100, seq:S(
+          "D4 A4 F4 A4 D4 A4 F4 C5 D4 A4 F4 A4 A#3 F4 D4 F4 " +
+          "D4 A4 F4 A4 D4 A4 F4 C5 A#3 F4 D4 F4 A#3 F4 D4 F4")}
+      ]}
+    ]
+  },
+
+  /* ---------- 2200, nachdem das Ventil zu ist: dieselbe Welt in Dur ---------- */
+  future_free: {
+    bpm:104, order:[0,1,0],
+    sections:[
+      { drums:S("K . . . . . H . S . . . . . H . K . . . . . H . S . . H . . H ."),
+        voices:[
+        {type:'triangle', gain:0.105, dur:0.55, cut:3000, seq:S(
+          "C5 . . .  E5 . . .  G5 . . .  E5 . . . " +
+          "A4 . . .  C5 . . .  E5 . . .  C5 . . . ")},
+        {type:'sine', gain:0.085, dur:0.44, cut:900, seq:S(
+          "C2 . . .  G2 . . .  C2 . . .  G2 . . . " +
+          "A1 . . .  E2 . . .  F2 . . .  C2 . . . ")},
+        {type:'sine', gain:0.040, dur:1.6, cut:1800, seq:S(
+          "G4 . . .  . . . .  E4 . . .  . . . . " +
+          "C5 . . .  . . . .  G4 . . .  . . . . ")}
+      ]},
+      { drums:S("K . H . . . S . K . H . . . S . K . H . . . S . K . H . S . S ."),
+        voices:[                                   /* Leitmotiv, endlich erleichtert */
+        {type:'triangle', gain:0.115, dur:0.9, cut:3200, seq:S(
+          "D5 . . .  . . A4 .  . . . .  F5 . . . " +
+          "C5 . . .  . . A4 .  . . . .  D5 . . . ")},
+        {type:'sine', gain:0.085, dur:0.44, cut:900, seq:S(
+          "D2 . . .  A2 . . .  F2 . . .  C2 . . . " +
+          "A2 . . .  F2 . . .  G2 . . .  D2 . . . ")}
       ]}
     ]
   }
@@ -437,6 +500,14 @@ var Snd = {
         [900,1150,760,1320].forEach(function(f,i){
           self.note(f, t + i*0.09, 0.10, {type:'square', gain:0.075, glide:0.8, cut:3000, bus:B});
         });
+        break;
+      case 'warp':                                    /* Sprung durch die Zeit */
+        for(var w=0; w<5; w++){
+          this.note(180 * Math.pow(1.5, w), t + w*0.055, 0.5,
+            {type:'triangle', gain:0.075, glide:2.2, cut:5200, bus:B});
+        }
+        this.noise(t, 0.7, {filter:'bandpass', freq:300, sweep:5200, q:2.2, gain:0.13, shape:0.9, bus:B});
+        this.note(1200, t+0.4, 0.5, {type:'sine', gain:0.05, glide:0.25, cut:4000, bus:B});
         break;
       case 'saber':
         this.note(110, t, 0.9, {type:'sawtooth', gain:0.07, glide:1.6, cut:700, q:6, bus:B});

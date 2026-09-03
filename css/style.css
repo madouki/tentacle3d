@@ -250,3 +250,46 @@ canvas{display:block;width:100%;height:100%}
   display:block;margin-top:7px;font-style:normal;font-size:10.5px;
   letter-spacing:2px;opacity:.5;
 }
+
+/* ---------- Blitz bei der Zeitreise ---------- */
+#flash{
+  position:fixed;inset:0;background:#dff6ff;opacity:0;pointer-events:none;z-index:22;
+}
+#flash.on{animation:flashPulse .5s ease-out}
+@keyframes flashPulse{
+  0%{opacity:0} 12%{opacity:.72} 100%{opacity:0}
+}
+
+/* ---------- Übersichtskarte ---------- */
+#mapGrid{
+  display:flex;flex-direction:column;gap:6px;margin:6px 0 4px;
+}
+.map-row{display:grid;grid-template-columns:112px repeat(5,1fr);gap:6px;align-items:stretch}
+.map-head .map-col{
+  font-size:10px;letter-spacing:1.4px;color:var(--dim);text-align:center;
+  padding-bottom:2px;text-transform:uppercase;
+}
+.map-era{
+  display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dim);
+  padding-right:4px;
+}
+.map-era .dot{width:11px;height:11px;border-radius:50%;border:2px solid #000;flex:0 0 auto}
+.map-cell{
+  height:46px;border-radius:9px;border:1px solid rgba(180,140,255,.20);
+  background:rgba(255,255,255,.04);cursor:pointer;transition:.12s;
+  display:grid;place-items:center;padding:0;
+}
+.map-cell:hover:not(.locked){background:rgba(255,212,71,.16);border-color:var(--hi)}
+.map-cell.here{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.45)}
+.map-cell.locked{opacity:.22;cursor:default;border-style:dashed}
+.map-cell .who{
+  width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  color:#1a1024;font-weight:bold;font-size:13px;border:2px solid rgba(0,0,0,.4);
+}
+.map-cell .pip{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.22)}
+.map-note{font-size:11px;color:var(--dim);margin:10px 0 0}
+@media (max-width:620px){
+  .map-row{grid-template-columns:74px repeat(5,1fr);gap:4px}
+  .map-era{font-size:10px}
+  .map-cell{height:38px}
+}
