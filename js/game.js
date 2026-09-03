@@ -1336,10 +1336,14 @@ function startGame(){
 
 document.getElementById('btnStart').onclick = function(){
   document.getElementById('titleScreen').classList.add('hidden');
-  goFullscreen();
-  Snd.init(); Snd.resume();
-  Voice.init();
+  /* Erst das Spiel, dann der Komfort: sollte requestFullscreen in einer
+     eingebetteten Umgebung stolpern, darf das den Start nicht verhindern. */
+  try{
+    Snd.init(); Snd.resume();
+    Voice.init();
+  }catch(e){}
   if(!S) startGame(); else Snd.play(eraTrack(era()));
+  goFullscreen();
 };
 document.getElementById('btnRestart').onclick = function(){
   document.getElementById('endScreen').classList.add('hidden');
