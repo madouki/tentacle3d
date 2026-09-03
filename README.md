@@ -34,6 +34,7 @@ Diamanten.
 | <kbd>M</kbd> <kbd>V</kbd> <kbd>U</kbd> | Musik / Stimmen / Untertitel |
 | <kbd>L</kbd> | Gesprächsprotokoll |
 | <kbd>C</kbd> | Chron-o-John von überall öffnen |
+| <kbd>T</kbd> | Texttempo umschalten (bis "nur weiterklicken") |
 | <kbd>F</kbd> | Vollbild |
 | <kbd>Leertaste</kbd> / <kbd>Esc</kbd> | Text überspringen / Auswahl abbrechen |
 
@@ -62,6 +63,11 @@ Klick oder Zifferntaste.
   Dachboden gedämpft, im Hof offen.
 - **Sprachausgabe** über die Web Speech API — jede Figur mit eigener Stimme, Tonhöhe und
   Sprechtempo. Untertitel laufen synchron mit und lassen sich einzeln abschalten.
+- **Vier Textgeschwindigkeiten** (<kbd>T</kbd>): gemütlich, normal, zügig — oder
+  "nur weiterklicken", dann wartet jede Zeile auf dich. Nach dem Ende der Sprachausgabe
+  hängt immer eine Nachlesezeit dran, weil Stimmen schneller sind als Augen.
+- **Hintergrundkulisse je Schauplatz**: Vogelrufe im Hof, Knistern an der Feuerstelle von
+  1776, Tropfen im Keller, Maschinensummen im Labor, elektrisches Zirpen in der Zukunft.
 - **Prozedurale Texturen** (Ziegel, Dielen, Gras, Beton, Zukunftspaneele) aus
   Canvas-Zeichnungen, Cartoon-Konturen, Kontaktschatten, weiche Schatten, sichtbare
   Lichtbahnen mit tanzendem Staub, Glühwürmchen und Ascheflocken, ziehende Wolken,
@@ -130,7 +136,8 @@ Hindernisumgehung bräuchte es ein Walkbox-System.
 
 Die Sprachausgabe hängt an den Stimmen des Betriebssystems. Sind keine deutschen Stimmen
 installiert, nimmt das Spiel die erstbeste — dann klingt es eigenwillig. Untertitel gibt es
-in jedem Fall.
+in jedem Fall, und mit <kbd>T</kbd> lässt sich ihr Tempo bis zum manuellen Weiterklicken
+verlangsamen.
 
 ## Rechtliches
 

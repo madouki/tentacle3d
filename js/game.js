@@ -153,7 +153,16 @@ function buildRoom(){
   walk.active = false; walk.then = null;
   hovered = null; hoveredRec = null; setStatus('');
   drawInv();
-  if(Snd.ready){ Snd.play(e); Snd.setSpace(r); }
+  if(Snd.ready){
+    Snd.play(e); Snd.setSpace(r);
+    var amb = null;
+    if(r === 'yard')         amb = (e === 'future') ? 'buzz' : 'birds';
+    else if(r === 'cellar')  amb = 'drip';
+    else if(r === 'attic')   amb = 'creak';
+    else if(r === 'lab')     amb = (e === 'future') ? 'buzz' : 'hum';
+    else if(r === 'kitchen') amb = (e === 'past') ? 'crackle' : null;
+    Snd.ambience(amb);
+  }
 }
 
 function rebuild(){
@@ -236,6 +245,18 @@ function switchTo(id){
 
 /* ---------------------- Untertitel + Sprachausgabe ------------------- */
 var sayQ = [], sayTimer = null, sayActive = false, sayDoneCb = null;
+var sayShownAt = 0, speakingWho = null;
+
+/* Wie lange eine Zeile stehen bleibt.  perChar 0 heißt: bis zum Klick.
+   tail ist die Nachlesezeit, die nach dem Ende der Sprachausgabe noch
+   drangehängt wird — Stimmen sind meist schneller als Augen.          */
+var TEXT_SPEEDS = [
+  {id:'slow',   icon:'\uD83D\uDC22', label:'gemütlich',  perChar:98, min:2900, tail:950},
+  {id:'normal', icon:'\uD83D\uDCAC', label:'normal',     perChar:74, min:2300, tail:700},
+  {id:'fast',   icon:'\u23E9',        label:'zügig',      perChar:54, min:1700, tail:480},
+  {id:'click',  icon:'\uD83D\uDC46', label:'nur weiterklicken', perChar:0, min:0, tail:0}
+];
+var speedIdx = 1;
 var subsOn = true, logLines = [];
 var SPEAKER = {sys:'#cbb8e8', npc:'#ffe0a0', tent:'#e0a0ff'};
 
@@ -254,7 +275,8 @@ function pushLog(who, text){
 function nextSay(){
   if(sayTimer){ clearTimeout(sayTimer); sayTimer = null; }
   if(!sayQ.length){
-    elSub.innerHTML = ''; sayActive = false;
+    elSub.innerHTML = ''; elSub.classList.remove('show');
+    sayActive = false; speakingWho = null;
     var done = sayDoneCb; sayDoneCb = null;
     if(done) setTimeout(done, 120);
     return;
@@ -264,34 +286,55 @@ function nextSay(){
   var color = SPEAKER[s.w] || (CH[s.w] ? CH[s.w].ui : '#ffffff');
   var label = CH[s.w] ? CH[s.w].name : (s.w === 'tent' ? 'LILA TENTAKEL' : '');
   pushLog(s.w, s.t);
+  sayShownAt = Date.now();
+  speakingWho = s.w;
+
+  var sp = TEXT_SPEEDS[speedIdx];
+  var manual = sp.perChar === 0;
+  var minRead = manual ? 0
+    : Math.max(sp.min, Math.min(12000, s.t.length * sp.perChar));
 
   if(subsOn){
     elSub.innerHTML = (label ? '<b>' + label + '</b>' : '') +
-                      s.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                      s.t.replace(/&/g,'&amp;').replace(/</g,'&lt;') +
+                      (manual ? '<i class="more">weiter &#9654;</i>' : '');
     elSub.style.color = color;
+    elSub.classList.remove('show');
+    void elSub.offsetWidth;                       // Einblenden neu anstoßen
+    elSub.classList.add('show');
   } else {
     elSub.innerHTML = '';
   }
 
-  var fallback = Math.max(1800, Math.min(7000, s.t.length * 55));
   var spoke = Voice.speak(s.t, s.w, function(){
     if(sayTimer){ clearTimeout(sayTimer); sayTimer = null; }
-    nextSay();
+    if(manual) return;                            // wartet auf den Klick
+    var elapsed = Date.now() - sayShownAt;
+    sayTimer = setTimeout(nextSay, Math.max(sp.tail, minRead - elapsed));
   });
-  sayTimer = setTimeout(nextSay, spoke ? fallback + 3500 : fallback);
+
+  if(manual) return;
+  /* Sicherheitsnetz: falls onend ausbleibt, läuft die Zeile trotzdem weiter.
+     Mit Stimme großzügig, damit lange Sätze nicht abgeschnitten werden. */
+  sayTimer = setTimeout(nextSay, spoke ? minRead + 8000 : minRead);
 }
 
 function clearSay(){
   sayQ = []; sayDoneCb = null;
   if(sayTimer){ clearTimeout(sayTimer); sayTimer = null; }
-  sayActive = false;
-  elSub.innerHTML = '';
+  sayActive = false; speakingWho = null;
+  elSub.innerHTML = ''; elSub.classList.remove('show');
   Voice.shutUp();
 }
 
-function skipSay(){
-  if(sayActive){ Voice.shutUp(); nextSay(); return true; }
-  return false;
+function skipSay(force){
+  if(!sayActive) return false;
+  /* Ein Klick, der nur dem Laufen galt, soll die Zeile nicht sofort
+     wegreißen — erst nach einem kurzen Moment gilt er als "weiter". */
+  if(!force && TEXT_SPEEDS[speedIdx].perChar > 0 && Date.now() - sayShownAt < 380) return true;
+  Voice.shutUp();
+  nextSay();
+  return true;
 }
 
 /* --------------------------- Auswahl-Dialog -------------------------- */
@@ -623,7 +666,7 @@ canvas.addEventListener('mousemove', function(ev){
 canvas.addEventListener('contextmenu', function(ev){
   ev.preventDefault();
   if(!S) return;
-  if(skipSay()) return;
+  if(skipSay(true)) return;
   var p = pick(ev);
   if(p.hs){
     var rec = p.hs;
@@ -660,11 +703,12 @@ document.addEventListener('keydown', function(ev){
   else if(k === 'u'){ toggleSubs(); }
   else if(k === 'l'){ toggleLog(); }
   else if(k === 'c'){ openChrono(); }
+  else if(k === 't'){ cycleSpeed(); }
   else if(dlgScreen && !dlgScreen.classList.contains('hidden') && /^[1-9]$/.test(k)){
     var btn = dlgOpts.children[parseInt(k,10) - 1];
     if(btn) btn.click();
   }
-  else if(k === ' '){ ev.preventDefault(); skipSay(); }
+  else if(k === ' '){ ev.preventDefault(); skipSay(true); }
 });
 
 /* ======================================================================
@@ -875,6 +919,7 @@ function winGame(){
 var btnMusic = document.getElementById('btnMusic');
 var btnVoice = document.getElementById('btnVoice');
 var btnSubs  = document.getElementById('btnSubs');
+var btnSpeed = document.getElementById('btnSpeed');
 var logScreen = document.getElementById('logScreen');
 
 function toggleMusic(){
@@ -891,6 +936,16 @@ function toggleVoice(){
     sayTimer = setTimeout(nextSay, 2200);
   }
 }
+function cycleSpeed(){
+  speedIdx = (speedIdx + 1) % TEXT_SPEEDS.length;
+  var sp = TEXT_SPEEDS[speedIdx];
+  btnSpeed.textContent = sp.icon;
+  btnSpeed.title = 'Texttempo: ' + sp.label + ' (T)';
+  /* Läuft gerade eine Zeile, gilt das neue Tempo ab der nächsten. */
+  if(!sayActive) say('Texttempo: ' + sp.label + '.', 'sys');
+  return sp;
+}
+
 function toggleSubs(){
   subsOn = !subsOn;
   btnSubs.classList.toggle('off', !subsOn);
@@ -934,6 +989,9 @@ function toggleFullscreen(){ isFullscreen() ? leaveFullscreen() : goFullscreen()
 btnMusic.onclick = toggleMusic;
 btnVoice.onclick = toggleVoice;
 btnSubs.onclick  = toggleSubs;
+btnSpeed.onclick = cycleSpeed;
+btnSpeed.textContent = TEXT_SPEEDS[speedIdx].icon;
+btnSpeed.title = 'Texttempo: ' + TEXT_SPEEDS[speedIdx].label + ' (T)';
 document.getElementById('btnLog').onclick  = toggleLog;
 document.getElementById('btnFull').onclick = toggleFullscreen;
 document.getElementById('btnHint').onclick = showHint;
@@ -1014,6 +1072,11 @@ function animate(){
         p.head.rotation.z = Math.sin(walk.phase*0.7)*0.045;
         p.torso.rotation.z = 0;
         actor.position.y = (Math.sin(walk.phase)*0.5+0.5)*0.04;
+      }
+      if(sayActive && speakingWho === S.who){
+        p.head.rotation.x = Math.sin(t*10.5)*0.055 + 0.02;
+      } else {
+        p.head.rotation.x *= 0.86;
       }
       /* Blinzeln */
       blinkTimer -= dt;

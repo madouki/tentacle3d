@@ -455,6 +455,60 @@ var Snd = {
     });
   },
 
+  /* ---------------------- Hintergrundkulisse ------------------------- */
+  _amb:null, _ambKind:null,
+
+  ambience:function(kind){
+    if(this._ambKind === kind) return;
+    this._ambKind = kind;
+    if(this._amb){ clearInterval(this._amb); this._amb = null; }
+    if(!kind || !this.ready) return;
+    var self = this;
+    this._amb = setInterval(function(){ self._ambTick(kind); }, 1900);
+  },
+
+  _ambTick:function(kind){
+    if(!this.on || !this.ready) return;
+    if(Math.random() > 0.5) return;                 // nicht bei jedem Takt
+    var t = this.ctx.currentTime + Math.random()*0.9, B = this.sfxBus, self = this;
+
+    switch(kind){
+      case 'birds':                                  // Hof, 1776 und Gegenwart
+        var n = 2 + (Math.random()*2|0), f0 = 1900 + Math.random()*900;
+        for(var i=0;i<n;i++)
+          this.note(f0 + i*160, t + i*0.11, 0.09,
+            {type:'sine', gain:0.030, glide:1.35, cut:6000, bus:B});
+        break;
+
+      case 'drip':                                   // Keller
+        this.note(1250, t, 0.10, {type:'sine', gain:0.045, glide:0.35, cut:4000, bus:B});
+        this.noise(t, 0.06, {filter:'bandpass', freq:2600, q:3, gain:0.022, bus:B});
+        break;
+
+      case 'hum':                                    // Labor der Gegenwart
+        this.note(72, t, 1.5, {type:'sawtooth', gain:0.022, cut:180, atk:0.5, bus:B});
+        this.note(144, t, 1.4, {type:'sine', gain:0.012, cut:400, atk:0.5, bus:B});
+        break;
+
+      case 'buzz':                                   // Zukunft
+        this.note(2400 + Math.random()*900, t, 0.07,
+          {type:'square', gain:0.016, glide:0.55, cut:7000, bus:B});
+        this.noise(t + 0.1, 0.05, {filter:'highpass', freq:5200, gain:0.014, bus:B});
+        break;
+
+      case 'creak':                                  // Dachboden
+        this.note(150 + Math.random()*90, t, 0.55,
+          {type:'sawtooth', gain:0.020, glide:0.72, cut:520, atk:0.14, bus:B});
+        break;
+
+      case 'crackle':                                // Feuerstelle, 1776
+        for(var k=0;k<3;k++)
+          this.noise(t + Math.random()*1.2, 0.045,
+            {filter:'bandpass', freq:1400 + Math.random()*1800, q:2, gain:0.020, bus:B});
+        break;
+    }
+  },
+
   toggle:function(){
     this.on = !this.on;
     if(this.master) this.master.gain.value = this.on ? 0.85 : 0.0;
@@ -476,7 +530,7 @@ var VOICE_STYLE = {
 var SPEAKER_ORDER = ['bernard','hoagie','laverne','npc','tent','sys'];
 
 var Voice = {
-  on:true, supported:false, _voice:null, _byWho:{}, _picked:false,
+  on:true, supported:false, _voice:null, _byWho:{}, _picked:false, _gen:0,
 
   init:function(){
     this.supported = !!(global.speechSynthesis && global.SpeechSynthesisUtterance);
@@ -504,7 +558,8 @@ var Voice = {
   speak:function(text, who, onEnd){
     if(!this.supported || !this.on) return false;
     try{
-      global.speechSynthesis.cancel();
+      var self = this, myGen = ++this._gen;
+      global.speechSynthesis.cancel();   // löst onend der alten Äußerung aus
       var u = new global.SpeechSynthesisUtterance(
         String(text).replace(/[\[\]]/g,'').replace(/&mdash;|—/g,',')
       );
@@ -515,6 +570,7 @@ var Voice = {
       var done = false, finish = function(){
         if(done) return;
         done = true;
+        if(myGen !== self._gen) return;  // längst überholt — nicht weiterschalten
         Snd.duck(false);
         if(onEnd) onEnd();
       };
@@ -526,6 +582,7 @@ var Voice = {
   },
 
   shutUp:function(){
+    this._gen++;                          // alle laufenden Rückrufe entwerten
     if(this.supported){ try{ global.speechSynthesis.cancel(); }catch(e){} }
     Snd.duck(false);
   },
