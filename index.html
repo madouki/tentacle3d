@@ -21,6 +21,7 @@
 <div id="flash"></div>
 
 <div id="status"></div>
+<div id="saved">&#10003; gespeichert</div>
 <div id="subtitle"></div>
 
 <div id="cast"></div>
@@ -138,9 +139,15 @@
           anklicken versucht, sie zu <b>kombinieren</b>.</li>
       <li>In den Räumen stecken <b>zwölf Anspielungen</b> auf andere Spiele und Filme.
           Am Ende wird gezählt, wie viele du gefunden hast.</li>
+      <li>Das Spiel <b>speichert automatisch</b>. Beim nächsten Besuch einfach
+          <b>Weiterspielen</b> — der Stand liegt in diesem Browser.</li>
     </ul>
 
-    <div class="btnrow"><button class="big" id="btnStart">Spiel starten</button></div>
+    <p id="saveInfo" class="save-info hidden"></p>
+    <div class="btnrow">
+      <button class="big hidden" id="btnContinue">Weiterspielen</button>
+      <button class="big" id="btnStart">Spiel starten</button>
+    </div>
   </div>
 </div>
 

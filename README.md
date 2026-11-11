@@ -55,6 +55,16 @@ Mit einigen Figuren lässt sich **richtig reden**: Der Gründervater, das Wach-T
 lila Tentakel haben Antwortbäume, die sich je nach Spielstand ändern. Antworten wählt man per
 Klick oder Zifferntaste.
 
+## Speichern
+
+Das Spiel **speichert automatisch** in `localStorage` — nach jedem Gegenstand, jeder Flagge,
+jedem Raum- und Figurenwechsel, dazu alle 20 Sekunden und beim Verlassen der Seite. Unten
+links erscheint kurz ein „✓ gespeichert". Beim nächsten Besuch steht auf dem Titelbildschirm
+**Weiterspielen** bereit, samt Zusammenfassung (Figur, Ort, Ziele, Zeitpunkt). **Neues Spiel**
+fragt zur Sicherheit nach, bevor der Stand überschrieben wird. Musik-, Stimmen-,
+Untertitel- und Tempo-Einstellungen werden separat gemerkt und gelten sofort wieder.
+Wer durchgespielt hat, dessen Stand wird gelöscht — das Ende ist das Ende.
+
 ## Was drinsteckt
 
 - **15 Räume** — Hof, Küche, Labor, Dachboden und Keller, jeweils in 1776, in der Gegenwart
@@ -85,6 +95,9 @@ Klick oder Zifferntaste.
   Canvas-Zeichnungen, Cartoon-Konturen, Kontaktschatten, weiche Schatten, sichtbare
   Lichtbahnen mit tanzendem Staub, Glühwürmchen und Ascheflocken, ziehende Wolken,
   kreisende Vögel, blinzelnde Figuren, Blenden beim Raumwechsel
+- **Autosave und Weiterspielen**: Der Stand liegt in `localStorage`, der Titelbildschirm
+  bietet beim nächsten Besuch „Weiterspielen" samt Zusammenfassung. Einstellungen werden
+  separat gemerkt. Siehe [Speichern](#speichern).
 - **Hervorhebung beim Überfahren**: Anklickbares leuchtet leicht auf, statt nur oben
   benannt zu werden
 - **Eigene Tageszeit je Epoche**: tiefe Morgensonne mit langen Schatten 1776, hoher Mittag
@@ -143,6 +156,8 @@ DOTT.give('diamond')     // Gegenstand ins Inventar
 DOTT.act('Eckstein')     // Hotspot auslösen
 DOTT.hint()              // Tipp zeigen, offene Ziele zurückgeben
 DOTT.eggs()              // gefundene Anspielungen
+DOTT.save()              // sofort speichern
+DOTT.wipe()              // Spielstand löschen
 ```
 
 ## Bekannte Grenzen

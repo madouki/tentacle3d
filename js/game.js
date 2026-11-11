@@ -35,6 +35,93 @@ function anyHas(item){
 }
 
 /* ======================================================================
+   1b. Speicherstand — Autosave nach localStorage, Weiterspielen am Titel
+   ====================================================================== */
+var SAVE_KEY = 'dott3d.save', SET_KEY = 'dott3d.settings';
+var saveTimer = null, savedToastTimer = null;
+
+function store(key, val){
+  try{ localStorage.setItem(key, val); return true; }catch(e){ return false; }
+}
+function unstore(key){ try{ localStorage.removeItem(key); }catch(e){} }
+
+function saveNow(quiet){
+  if(!S) return;
+  if(actor){ me().x = actor.position.x; me().z = actor.position.z; }
+  var ok = store(SAVE_KEY, JSON.stringify({v:1, at:Date.now(), S:S, log:logLines}));
+  if(ok && !quiet) showSaved();
+}
+function saveSoon(){
+  if(!S) return;
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){ saveTimer = null; saveNow(); }, 400);
+}
+function clearSave(){ unstore(SAVE_KEY); }
+
+/* Ein Stand aus einer älteren Fassung darf das Spiel nicht abstürzen
+   lassen: unbekannte Räume, Figuren und Gegenstände fliegen heraus. */
+function sanitize(st){
+  if(!st || !st.chars || !CH[st.who]) return null;
+  var ok = true;
+  W.CHAR_IDS.forEach(function(id){
+    var c = st.chars[id];
+    if(!c || !W.BUILDERS[c.room]){ ok = false; return; }
+    c.inv = (c.inv || []).filter(function(i){ return ITEMS[i]; });
+    c.x = isFinite(c.x) ? c.x : 0;
+    c.z = isFinite(c.z) ? c.z : 0;
+  });
+  if(!ok) return null;
+  st.f = st.f || {}; st.eggs = st.eggs || {};
+  st.sel = null; st.hintStep = null; st.hintLevel = 0;
+  return st;
+}
+function loadSave(){
+  try{
+    var d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if(!d || d.v !== 1) return null;
+    var st = sanitize(d.S);
+    if(!st) return null;
+    return {at:d.at || 0, S:st, log:Array.isArray(d.log) ? d.log.slice(-60) : []};
+  }catch(e){ return null; }
+}
+
+function showSaved(){
+  var el = document.getElementById('saved');
+  if(!el) return;
+  el.classList.add('on');
+  if(savedToastTimer) clearTimeout(savedToastTimer);
+  savedToastTimer = setTimeout(function(){ el.classList.remove('on'); }, 1200);
+}
+
+function saveSettings(){
+  store(SET_KEY, JSON.stringify({music:Snd.on, voice:Voice.on, subs:subsOn, speed:speedIdx}));
+}
+function applySettings(){
+  var d = null;
+  try{ d = JSON.parse(localStorage.getItem(SET_KEY) || 'null'); }catch(e){}
+  if(!d) return;
+  if(typeof d.music === 'boolean'){
+    Snd.on = d.music;
+    document.getElementById('btnMusic').classList.toggle('off', !d.music);
+  }
+  if(typeof d.voice === 'boolean'){
+    Voice.on = d.voice;
+    document.getElementById('btnVoice').classList.toggle('off', !d.voice);
+  }
+  if(typeof d.subs === 'boolean'){
+    subsOn = d.subs;
+    document.getElementById('btnSubs').classList.toggle('off', !d.subs);
+  }
+  if(d.speed >= 0 && d.speed < TEXT_SPEEDS.length){
+    speedIdx = d.speed;
+    var sp = TEXT_SPEEDS[speedIdx];
+    var b = document.getElementById('btnSpeed');
+    b.textContent = sp.icon;
+    b.title = 'Texttempo: ' + sp.label + ' (T)';
+  }
+}
+
+/* ======================================================================
    2. Renderer, Kamera, Licht
    ====================================================================== */
 var canvas = document.getElementById('c');
@@ -277,6 +364,7 @@ function switchTo(id){
   fadeThen(function(){
     S.who = id; S.sel = null;
     buildRoom(); drawCast();
+    saveSoon();
     say('[' + CH[id].name + ' — ' + W.ROOM_LABEL[me().room][era()] + ']', 'sys');
   });
 }
@@ -467,6 +555,7 @@ function eggFound(){ return Object.keys(S.eggs).length; }
 function foundEgg(id){
   if(!id || S.eggs[id]) return;
   S.eggs[id] = true;
+  saveSoon();
   Snd.sfx('egg');
   setTimeout(function(){
     say('✦ Anspielung entdeckt — ' + eggFound() + ' von ' + eggTotal() + '.', 'sys');
@@ -485,19 +574,22 @@ var API = {
   give: function(who, item){
     if(!has(who, item)) S.chars[who].inv.push(item);
     if(who === S.who){ drawInv(); armRaise = 1; }
+    saveSoon();
   },
   drop: function(who, item){
     var i = S.chars[who].inv.indexOf(item);
     if(i >= 0) S.chars[who].inv.splice(i, 1);
     if(who === S.who){ if(S.sel === item) S.sel = null; drawInv(); }
+    saveSoon();
   },
   set: function(flag, val){
     S.f[flag] = (val === undefined) ? true : val;
     S.hintStep = null; S.hintLevel = 0;
     if(Snd.ready) Snd.setIntensity(progress());
+    saveSoon();
     setTimeout(rebuild, 0);
   },
-  setQuiet: function(flag, val){ S.f[flag] = (val === undefined) ? true : val; },
+  setQuiet: function(flag, val){ S.f[flag] = (val === undefined) ? true : val; saveSoon(); },
   rebuild: rebuild,
   rebuildSoon: function(){ setTimeout(rebuild, 0); },
   flush: askFlush,
@@ -754,6 +846,7 @@ function changeRoom(target){
       me().x = 4.0; me().z = 2.0;
     }
     buildRoom();
+    saveSoon();
     say('[' + W.ROOM_LABEL[target][e] + ']', 'sys');
   });
 }
@@ -1056,6 +1149,7 @@ function wearCostume(){
   if(S.f.disguised) return false;
   S.f.disguised = true;
   S.hintStep = null; S.hintLevel = 0;
+  saveSoon();
   Snd.sfx('solve');
   say('Laverne zwängt sich in das Tentakelkostüm.');
   say('"Kratzt wie Stahlwolle. Aber ich sehe aus wie eine sehr überzeugte Verwaltungsangestellte."','laverne');
@@ -1068,6 +1162,7 @@ function wearCostume(){
    10. Ende
    ====================================================================== */
 function winGame(){
+  clearSave();                       // Durchgespielt — nichts mehr zu retten
   Snd.sfx('win');
   Snd.play('win');
   Snd.setSpace('yard');
@@ -1108,6 +1203,7 @@ function toggleMusic(){
   var on = Snd.toggle();
   btnMusic.classList.toggle('off', !on);
   if(on) Snd.play(S ? eraTrack(era()) : 'title');
+  saveSettings();
 }
 function toggleVoice(){
   var on = Voice.toggle();
@@ -1116,6 +1212,7 @@ function toggleVoice(){
     if(sayTimer) clearTimeout(sayTimer);
     sayTimer = setTimeout(nextSay, 2200);
   }
+  saveSettings();
 }
 function cycleSpeed(){
   speedIdx = (speedIdx + 1) % TEXT_SPEEDS.length;
@@ -1124,6 +1221,7 @@ function cycleSpeed(){
   btnSpeed.title = 'Texttempo: ' + sp.label + ' (T)';
   /* Läuft gerade eine Zeile, gilt das neue Tempo ab der nächsten. */
   if(!sayActive) say('Texttempo: ' + sp.label + '.', 'sys');
+  saveSettings();
   return sp;
 }
 
@@ -1132,6 +1230,7 @@ function toggleSubs(){
   btnSubs.classList.toggle('off', !subsOn);
   if(!subsOn) elSub.innerHTML = '';
   say(subsOn ? 'Untertitel an.' : '', 'sys');
+  saveSettings();
 }
 
 function openLog(){
@@ -1177,6 +1276,7 @@ document.getElementById('btnLog').onclick  = toggleLog;
 document.getElementById('btnFull').onclick = toggleFullscreen;
 document.getElementById('btnHint').onclick = showHint;
 document.getElementById('btnHelp').onclick = function(){
+  refreshTitle();
   document.getElementById('titleScreen').classList.remove('hidden');
 };
 document.getElementById('btnCloseLog').onclick = closeLog;
@@ -1435,18 +1535,78 @@ function startGame(){
   say('Der Chron-o-John ist explodiert. Bernard steckt in der Gegenwart fest.', 'sys');
   say('"Hoagie? Laverne? Hört ihr mich? … Natürlich nicht. Ihr seid zweihundert Jahre weit weg."', 'bernard');
   say('Oben links wechselst du die Figur, unten liegt dein Inventar. H gibt einen Tipp.', 'sys');
+  saveSoon();
 }
 
-document.getElementById('btnStart').onclick = function(){
+function continueGame(d){
+  S = d.S;
+  logLines = d.log;
+  clearSay();
+  drawCast();
+  buildRoom();
+  resize();
+  Snd.init(); Snd.resume(); Snd.play(eraTrack(era()));
+  say('[Spielstand geladen — ' + CH[S.who].name + ', ' +
+      W.ROOM_LABEL[me().room][era()] + '.]', 'sys');
+}
+
+/* Titelbildschirm: mit Stand wird „Weiterspielen“ die erste Wahl. */
+function refreshTitle(){
+  var d = loadSave();
+  var btnC = document.getElementById('btnContinue');
+  var btnS = document.getElementById('btnStart');
+  var info = document.getElementById('saveInfo');
+  if(!d){
+    btnC.classList.add('hidden');
+    info.classList.add('hidden');
+    btnS.textContent = 'Spiel starten';
+    btnS.classList.remove('alt');
+    return;
+  }
+  var st = d.S, c = CH[st.who];
+  /* Einige done()-Prüfungen lesen das aktive S — kurz einsetzen. */
+  var prev = S; S = st;
+  var real = STEPS.filter(function(s){ return s.id !== 'finale'; });
+  var done = real.filter(function(s){ return s.done(st.f); }).length;
+  S = prev;
+  var when = d.at ? new Date(d.at).toLocaleString('de-DE',
+    {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+  info.textContent = c.name + ' · ' + W.ROOM_LABEL[st.chars[st.who].room][c.era] +
+    ' · ' + done + '/' + real.length + ' Ziele' + (when ? ' · zuletzt ' + when : '');
+  info.classList.remove('hidden');
+  btnC.classList.remove('hidden');
+  btnS.textContent = 'Neues Spiel';
+  btnS.classList.add('alt');
+}
+
+document.getElementById('btnContinue').onclick = function(){
   document.getElementById('titleScreen').classList.add('hidden');
-  /* Erst das Spiel, dann der Komfort: sollte requestFullscreen in einer
-     eingebetteten Umgebung stolpern, darf das den Start nicht verhindern. */
-  try{
-    Snd.init(); Snd.resume();
-    Voice.init();
-  }catch(e){}
-  if(!S) startGame(); else Snd.play(eraTrack(era()));
+  try{ Snd.init(); Snd.resume(); Voice.init(); }catch(e){}
+  if(S){ Snd.play(eraTrack(era())); }
+  else {
+    var d = loadSave();
+    if(d) continueGame(d); else startGame();
+  }
   goFullscreen();
+};
+
+document.getElementById('btnStart').onclick = function(){
+  var begin = function(){
+    document.getElementById('titleScreen').classList.add('hidden');
+    clearSave();
+    /* Erst das Spiel, dann der Komfort: sollte requestFullscreen in einer
+       eingebetteten Umgebung stolpern, darf das den Start nicht verhindern. */
+    try{ Snd.init(); Snd.resume(); Voice.init(); }catch(e){}
+    startGame();
+    goFullscreen();
+  };
+  if(S || loadSave()){
+    showChoice('Neues Spiel',
+      'Dabei geht der gespeicherte Stand verloren. Wirklich von vorne anfangen?',
+      [{label:'Neues Spiel', fn:begin}, {label:'Abbrechen', alt:true}]);
+    return;
+  }
+  begin();
 };
 document.getElementById('btnRestart').onclick = function(){
   document.getElementById('endScreen').classList.add('hidden');
@@ -1467,7 +1627,7 @@ document.addEventListener('keydown', primeTitleMusic);
 global.DOTT = {
   help:function(){ return ['DOTT.state()','DOTT.spots()','DOTT.act(name,verb)','DOTT.sel(item)',
                            'DOTT.give(item)','DOTT.who(id)','DOTT.go(room)','DOTT.flag(k,v)',
-                           'DOTT.hint()','DOTT.eggs()']; },
+                           'DOTT.hint()','DOTT.eggs()','DOTT.save()','DOTT.wipe()']; },
   state:function(){ return {who:S.who, room:me().room, era:era(), flags:S.f, eggs:S.eggs,
     inv:{bernard:S.chars.bernard.inv.slice(), hoagie:S.chars.hoagie.inv.slice(),
          laverne:S.chars.laverne.inv.slice()}}; },
@@ -1503,8 +1663,19 @@ global.DOTT = {
   },
   flag:function(k,v){ S.f[k] = (v === undefined) ? true : v; buildRoom(); return S.f; },
   hint:function(){ showHint(); return openSteps().map(function(s){ return s.id; }); },
-  eggs:function(){ return {found:eggFound(), total:eggTotal(), list:Object.keys(S.eggs)}; }
+  eggs:function(){ return {found:eggFound(), total:eggTotal(), list:Object.keys(S.eggs)}; },
+  save:function(){ saveNow(); return 'gespeichert'; },
+  wipe:function(){ clearSave(); return 'Spielstand gelöscht'; }
 };
+
+/* Einstellungen und Titelbildschirm vorbereiten, bevor jemand klickt. */
+applySettings();
+refreshTitle();
+
+/* Beim Verlassen und regelmäßig den Stand sichern — auch ohne Ereignis. */
+global.addEventListener('pagehide', function(){ saveNow(true); });
+document.addEventListener('visibilitychange', function(){ if(document.hidden) saveNow(true); });
+setInterval(function(){ if(S) saveNow(true); }, 20000);
 
 document.getElementById('boot').classList.add('hidden');
 resize();

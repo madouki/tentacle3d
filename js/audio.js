@@ -291,7 +291,7 @@ var Snd = {
     var c = this.ctx;
 
     this.master = c.createGain();
-    this.master.gain.value = 0.85;
+    this.master.gain.value = this.on ? 0.85 : 0.0;
 
     var conv = null;                                  // kurze künstliche Hallfahne
     try{
